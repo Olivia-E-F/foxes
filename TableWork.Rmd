@@ -1,0 +1,342 @@
+---
+title: "TableWork"
+author: "Olivia Freides"
+date: "2/16/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Doc for figuring out the mechanics of the sheaf structure in R:
+
+```{r}
+library(tidyverse)
+```
+
+Sheaf Model from SeafCanon...
+Figure 6A + 6B: 
+
+TABLE 1 AND 2:
+
+```{r 6a}
+# Table1 <- data.frame(Sensor = c("Flight plan", NA, NA, "ATC", NA, NA, NA, NA, "RDF 1", NA, "RDF 2", NA, "Sat", NA,NA, "Field", NA, NA, NA, NA, NA,"Crash est.", NA, "Consist. rad.", "Error"), Entity = c("x", "y", "z","x","y","z","v_x","v_y","Theta1", "t","Theta2", "t","s", "s_x", "s_y","x","y","z","v_x","v_y","t","x","y", NA, NA), Case1 = c(70.662, 42.829, 11178, 70.587, 42.741, 11346, -495, 164, 77.1, 0.943, 61.3, 0.89, NA, 64.599, 44.243, 70.649, 42.753, 11220, -495, 164, 0.928, 65.00013, 44.1277, 15.7, 16.1), Case2 = c(70.663, 42.752, 11299, 70.657, 42.773, 11346, -495, 164, 77.2, 0.93, 63.2, 0.974, NA, 64.63, 44.287, 70.668, 42.809, 11431, -495, 164, 1.05, 64.2396, 44.3721, 11.6, 17.3), Case3 = c(70.612, 42.834, 11237, 70.617, 42.834, 11236, -419, 310, 77.2, 0.985, 63.3, 1.05, NA, 62.742, 44.55, 70.626, 42.814, 11239, -419, 311, 1.02, 65.3745, 45.6703, 152, 193), Units = c("W", "N", "m", "W", "N", "m", "km/h W", "km/h N", "true N", "h", "true N", "h", NA, "W", "N", "W", "N", "m", "km/h W", "km/h N", "h","W", "N", "km", "km"))
+
+#write_csv(Table1, "Table1.csv")
+
+
+SixA <- data.frame(X = c("x","y","z","v_x","v_y","t","s","Theta1", "Theta2"), U1 = c("x","y","z", NA, NA, NA, NA, NA, NA), U2 = c("x","y","z","v_x","v_y", NA, NA, NA, NA), U3 = c("Theta1","t", NA, NA, NA, NA, NA, NA, NA), U4 = c("Theta2", "t", NA, NA, NA, NA, NA, NA, NA), U5 = c("s","Theta1", "Theta2", NA, NA, NA, NA, NA, NA), V1 = c("Theta1", NA, NA, NA, NA, NA, NA, NA, NA), V2 = c("Theta2", NA, NA, NA, NA, NA, NA, NA, NA), V3 = c("t", NA, NA, NA, NA, NA, NA, NA, NA))
+
+
+SixA %>%
+  pivot_longer(cols = 1:9, names_to = "sensor", values_to = "entity") %>%
+  arrange(desc(sensor)) -> SixA
+
+
+SixA
+
+# SixA %>%
+#   mutate(sensor = sensor) %>%
+#   group_by(sensor) %>%
+#   nest()  -> m
+
+# cross2(m$data, m$data)
+```
+
+
+if sensor goes through function A, all entity are outputs, but also is the group of entities the senesor? So A_OUT == X here? i,e, in table 6a, SENSOR would have first row A_out.... down until function B?
+
+    
+This was wrong: return(list( Theta1 = atan2(entity[[1]] + entity[[2]]* entity[[3]] - r_1x, entity[[4]] + entity[[5]]* entity[[3]]- r_1y),t = entity[[3]]))
+
+
+```{r}
+
+entitytest <- entitytest <- list(entity = c('x', "y", "z", "v_x", "v_y", "t"), value = c(70.649, 42.753, 11220.000, -495.000, 164.000, .928))
+
+testyfn <- function(stalk) {
+  #for (i in stalk[1]) { #for index in the entity column of the stalk
+   # print(length(stalk[[1]])) #checkpoint for length of the list 'entity'
+    for (i in 1:length(stalk[[1]])) { #
+      #print(typeof(i)) #type of needs to be integer and not char. 
+      #print(c(i, stalk[[1]][i])) # i here is number from 1 to length of stalk 1
+    if (stalk[[1]][[i]] == "x"){ #general: if i = x we want to assocate value of x . wanted to have program figure out variables for us so we dont have to define by ourselves. 
+      x <- stalk[[2]][[i]] # here x is assigned to its cell value i in column value stalk[[2]]
+      x # this prints x as a check 
+      #break #breaks stop program once x is found. 
+      #}
+    } else if (stalk[[1]][[i]] == "y"){
+      y <- stalk[[2]][[i]]
+    } else if (stalk[[1]][[i]] == "v_x"){
+      v_x <- stalk[[2]][[i]]
+    } else if (stalk[[1]][[i]] == "v_y"){
+      v_y <- stalk[[2]][[i]]
+    } else if (stalk[[1]][[i]] == "t"){
+      t <- stalk[[2]][[i]]
+    }
+  }
+    
+  r_1x <- -73.662574
+  r_1y <- 42.733838
+  #x <- 3
+  #y <- 5
+  #v_x <- 6
+  #v_y <-7
+  #t <- 3
+  
+  # we assigned actual values to everything bc it was having an issue relating the two. 
+  return(data.frame(entity = c("Theta1", "t"), value = c(atan2(x + v_x*t - r_1x, y +
+                                                                 v_y*t- r_1y), t)))
+}
+
+```
+
+
+```{r}
+# an example of what we did before:
+NotA <- function(stalk) {
+  r_1x <- -73.662574
+  r_1y <- 42.733838
+  x <- stalk$value[stalk$entity=="x"][[1]]
+  y <- stalk$value[stalk$entity=="y"][[1]]
+  v_x <- stalk$value[stalk$entity=="v_x"][[1]]
+  v_y <- stalk$value[stalk$entity=="v_y"][[1]]
+  t <- stalk$value[stalk$entity=="t"][[1]]
+  return(data.frame(entity = c("Theta1", "t"), value = c(atan2(x + v_x*t - r_1x, y +
+                                                                 v_y*t- r_1y), t)))
+}
+
+```
+
+```{r}
+A <- function(stalk) {
+  r_1x <- -73.662574
+  r_1y <- 42.733838
+  
+    for (i in 1:length(stalk[[1]])) {
+    if (stalk[[1]][[i]] == "x"){ #general: if i = x we want to assocate value of x .
+      # wanted to have program figure out variables for us so we dont have to define by ourselves. 
+      x <- stalk[[2]][[i]] # x is assigned to its cell value i in column value stalk[[2]]
+      x # this prints x as a check 
+      #break #breaks stop program once x is found. 
+    } else if (stalk[[1]][[i]] == "y"){
+      y <- stalk[[2]][[i]]
+    } else if (stalk[[1]][[i]] == "v_x"){
+      v_x <- stalk[[2]][[i]]
+    } else if (stalk[[1]][[i]] == "v_y"){
+      v_y <- stalk[[2]][[i]]
+    } else if (stalk[[1]][[i]] == "t"){
+      t <- stalk[[2]][[i]]
+    }
+  }
+  
+  return(data.frame(entity = c("Theta1", "t"), value = c(atan2(x + v_x*t - r_1x, y +
+                                                                 v_y*t- r_1y), t)))
+}
+
+B <- function(stalk) {
+  r_1x <- -73.662574
+  r_1y <- 42.733838
+
+  for (i in 1:length(stalk[[1]])) {
+    if (stalk[[1]][[i]] == "x"){ #general: if i = x we want to assocate value of x .
+      # wanted to have program figure out variables for us so we dont have to define by ourselves. 
+      x <- stalk[[2]][[i]] # x is assigned to its cell value i in column value stalk[[2]]
+      x # this prints x as a check 
+      #break #breaks stop program once x is found. 
+    } else if (stalk[[1]][[i]] == "y"){
+      y <- stalk[[2]][[i]]
+    } else if (stalk[[1]][[i]] == "v_x"){
+      v_x <- stalk[[2]][[i]]
+    } else if (stalk[[1]][[i]] == "v_y"){
+      v_y <- stalk[[2]][[i]]
+    } else if (stalk[[1]][[i]] == "t"){
+      t <- stalk[[2]][[i]]
+    }
+  }
+  return(data.frame(entity = c("Theta2", "t"), value = c(atan2(x + v_x*t - r_1x, y + v_y*t -
+                                                             r_1y), t)))
+}
+
+# also correct. 
+C <- function(stalk) {
+  r_1x <- -73.662574
+  r_1y <- 42.733838
+  
+  for (i in 1:length(stalk[[1]])) {
+    if (stalk[[1]][[i]] == "x"){ #general: if i = x we want to assocate value of x .
+      # wanted to have program figure out variables for us so we dont have to define by ourselves. 
+      x <- stalk[[2]][[i]] # x is assigned to its cell value i in column value stalk[[2]]
+      x # this prints x as a check 
+      #break #breaks stop program once x is found. 
+    } else if (stalk[[1]][[i]] == "s_x"){
+      s_x <- stalk[[2]][[i]]
+    } else if (stalk[[1]][[i]] == "s_y"){
+      s_y <- stalk[[2]][[i]]
+    }
+  }
+  
+  return(data.frame(entity = "Theta1" , value = atan2(s_x - r_1x, s_y - r_1y)))
+}
+
+
+D <- function(stalk) {
+  r_2x <- -77.0897
+  r_2y <- 38.935
+  
+  for (i in 1:length(stalk[[1]])) {
+    if (stalk[[1]][[i]] == "x"){ #general: if i = x we want to assocate value of x .
+      # wanted to have program figure out variables for us so we dont have to define by ourselves. 
+      x <- stalk[[2]][[i]] # x is assigned to its cell value i in column value stalk[[2]]
+      x # this prints x as a check 
+      #break #breaks stop program once x is found. 
+    } else if (stalk[[1]][[i]] == "s_x"){
+      s_x <- stalk[[2]][[i]]
+    } else if (stalk[[1]][[i]] == "s_y"){
+      s_y <- stalk[[2]][[i]]
+    }
+  }
+  
+  return(data.frame(entity = "Theta2", value = atan2(s_x - r_2x, s_y - r_2y)))
+}
+
+E <- function(stalk) {
+  
+    for (i in 1:length(stalk[[1]])) {
+    if (stalk[[1]][[i]] == "x"){ #general: if i = x we want to assocate value of x .
+      # wanted to have program figure out variables for us so we dont have to define by ourselves. 
+      x <- stalk[[2]][[i]] # x is assigned to its cell value i in column value stalk[[2]]
+      x # this prints x as a check 
+      #break #breaks stop program once x is found. 
+    } else if (stalk[[1]][[i]] == "y"){
+      y <- stalk[[2]][[i]]
+    } else if (stalk[[1]][[i]] == "v_x"){
+      v_x <- stalk[[2]][[i]]
+    } else if (stalk[[1]][[i]] == "v_y"){
+      v_y <- stalk[[2]][[i]]
+    } else if (stalk[[1]][[i]] == "t"){
+      t <- stalk[[2]][[i]]
+    }
+  }
+  return(data.frame(entity = c("s", "Theta1", "Theta2"), value = c(x + v_x*t, y + v_y*t)))
+}
+
+```
+
+
+```{r}
+#X to U2
+#rename tab to stalk
+pr1xpr2 <- function(stalk){
+  stalk[stalk$entity=="x"|stalk$entity=="y"|stalk$entity=="z"|
+          stalk$entity=="v_x"|stalk$entity== "v_y",]
+}
+
+#pr1 for u2 -> u1
+U2_pr1 <- function(stalk){
+  stalk[stalk$entity=="x"|stalk$entity=="y"|stalk$entity=="z",]
+}
+
+#pr1 for u3 -> v1
+U3_pr1 <- function(stalk){
+  stalk[stalk$entity=="Theta1",]
+}
+
+#pr2 for u3 -> v3
+U34_pr2 <- function(stalk){
+  stalk[stalk$entity=="t",]
+}
+
+#pr1 for u4 -> v2
+U4_pr1 <- function(stalk){
+  stalk[stalk$entity=="Theta2",]
+}
+
+#tab[tab$name=='z'|tab$name=='x',]
+```
+
+
+Six B:
+On to the restriction table! :[]
+
+```{r 6b}
+# WANT IT TO LOOK LIKE:
+
+#data.frame(SSource = U1, SDest = U2, Map = FN)
+
+SixB <- tibble(SSource = c("X", "X", "X", "X", "U2", "U3", "U3" , "U5", "U5", "U4",
+                               "U4"),
+                   SDest = (c("U2", "U3", "U5", "U4", "U1", "V1", "V3",
+                                                  "V1", "V2", "V3", "V2")),
+                   DMap = c(pr1xpr2, A, E, B, U2_pr1, U3_pr1, U34_pr2, C, D, U34_pr2,
+                           U4_pr1))
+as.data.frame(SixB) -> SixB
+
+SixB
+
+
+```
+
+
+If you have the same set of entities you have the same sensors:
+
+
+```{r}
+#for (i in SixB$DMap){
+#  do.call(i, enter)
+#}
+
+#do.call(A, enter)
+
+#alter > ncol(SixB)
+```
+
+
+
+Assignment Table;
+GOAL!
+
+```{r}
+#Assignment <- as.data.frame(sensor = c(), value = c())
+#flight plan = U1
+
+Table1 <- read.csv("Assignment2.csv")
+
+Table1 %>%
+  select(Key, entity, Case1) %>% #selecting vars for ...
+  group_by(Key) %>% #grouping by key for ...
+  rename(value = Case1)%>% #renaming case1 to value for test.
+  nest(entity = entity, value = value) -> andrea
+
+
+%>%
+  nest(StalkValue = c(entity, value))-> Assignment 
+
+
+# andrea suggested I not use the nested table, bc of how it was presenting, she suggested two different columns. 
+  
+  
+
+
+
+```
+
+```{r}
+
+SixB %>%
+  left_join(andrea, by = c(SSource = "Key")) -> SixB2 # or andrea/assigmnt
+
+SixB2 %>%
+  mutate(StalkOutput = invoke_map(.f = DMap, .x = entity))
+
+SixB %>%
+  left_join(Assignment, by = c(SSource = "Key"))%>%
+  mutate(StalkOutput = map2(DMap,StalkValue,  ~ .x(.y)))
+# not a dim prob. 
+#this should run. 
+
+```
+
+
+
