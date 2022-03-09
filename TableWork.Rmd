@@ -53,7 +53,8 @@ This was wrong: return(list( Theta1 = atan2(entity[[1]] + entity[[2]]* entity[[3
 
 ```{r}
 
-entitytest <- entitytest <- list(entity = c('x', "y", "z", "v_x", "v_y", "t"), value = c(70.649, 42.753, 11220.000, -495.000, 164.000, .928))
+entitytest <- entitytest <- list(entity = c('x', "y", "z", "v_x", "v_y", "t", "s_x", "s_y", "s"), value = c(70.649, 42.753, 11220.000, -495.000, 164.000, .928, .0123, 0.550, 55)) #note that i made up values for entity test s_x and s_y, just to see if every function would run AND s
+
 
 testyfn <- function(stalk) {
   #for (i in stalk[1]) { #for index in the entity column of the stalk
@@ -201,7 +202,8 @@ D <- function(stalk) {
   return(data.frame(entity = "Theta2", value = atan2(s_x - r_2x, s_y - r_2y)))
 }
 
-E <- function(stalk) {
+E <- function(stalk) { # im excluding s for now bc idk if it should be here
+  s <- NA
   
     for (i in 1:length(stalk[[1]])) {
     if (stalk[[1]][[i]] == "x"){ #general: if i = x we want to assocate value of x .
@@ -217,9 +219,12 @@ E <- function(stalk) {
       v_y <- stalk[[2]][[i]]
     } else if (stalk[[1]][[i]] == "t"){
       t <- stalk[[2]][[i]]
+    #} else if (stalk[[1]][[i]] == "s"){
+     # s <- stalk[[2]][[i]]
     }
   }
-  return(data.frame(entity = c("s", "Theta1", "Theta2"), value = c(x + v_x*t, y + v_y*t)))
+  return(data.frame(entity = c("s", "Theta1", "Theta2"), value = c(s, x + v_x*t, y + v_y*t))) 
+  # add s to output if needed
 }
 
 ```
@@ -228,9 +233,9 @@ E <- function(stalk) {
 ```{r}
 #X to U2
 #rename tab to stalk
-pr1xpr2 <- function(stalk){
-  stalk[stalk$entity=="x"|stalk$entity=="y"|stalk$entity=="z"|
-          stalk$entity=="v_x"|stalk$entity== "v_y",]
+pr1xpr2 <- function(stalk){ # stalk entity is stalk[[1]]
+  stalk[stalk[[1]]=="x"|stalk[[1]]=="y"|stalk[[1]]=="z"|
+          stalk[[1]]=="v_x"|stalk[[1]] == "v_y",]
 }
 
 #pr1 for u2 -> u1
