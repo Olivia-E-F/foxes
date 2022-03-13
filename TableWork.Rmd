@@ -10,6 +10,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 Doc for figuring out the mechanics of the sheaf structure in R:
+**** Function E doesnt work, functions with thetas do not work ****
 
 ```{r}
 library(tidyverse)
@@ -53,7 +54,8 @@ This was wrong: return(list( Theta1 = atan2(entity[[1]] + entity[[2]]* entity[[3
 
 ```{r}
 
-entitytest <- entitytest <- list(entity = c('x', "y", "z", "v_x", "v_y", "t", "s_x", "s_y", "s"), value = c(70.649, 42.753, 11220.000, -495.000, 164.000, .928, .0123, 0.550, 55)) #note that i made up values for entity test s_x and s_y, just to see if every function would run AND s
+entitytest <- list(entity = c("x", "y", "z", "v_x", "v_y", "t", list(s = c("s_x","s_y"))), value = c(70.649, 42.753, 11220.000, -495.000, 164.000, .928, list(s = c(.0123, 1234)))) #note that i made up values for entity test s_x and s_y, just to see if every function would run AND s
+# S should = sx and sy. 
 
 
 testyfn <- function(stalk) {
@@ -164,53 +166,42 @@ B <- function(stalk) {
 C <- function(stalk) {
   r_1x <- -73.662574
   r_1y <- 42.733838
-  
   for (i in 1:length(stalk[[1]])) {
-    if (stalk[[1]][[i]] == "x"){ #general: if i = x we want to assocate value of x .
-      # wanted to have program figure out variables for us so we dont have to define by ourselves. 
-      x <- stalk[[2]][[i]] # x is assigned to its cell value i in column value stalk[[2]]
-      x # this prints x as a check 
+    if (stalk[[1]][[i]] == "s_x"){# this prints x as a check 
       #break #breaks stop program once x is found. 
-    } else if (stalk[[1]][[i]] == "s_x"){
       s_x <- stalk[[2]][[i]]
     } else if (stalk[[1]][[i]] == "s_y"){
       s_y <- stalk[[2]][[i]]
     }
-  }
-  
+    }
   return(data.frame(entity = "Theta1" , value = atan2(s_x - r_1x, s_y - r_1y)))
 }
 
 
-D <- function(stalk) {
+D <- function(stalk){
   r_2x <- -77.0897
   r_2y <- 38.935
-  
   for (i in 1:length(stalk[[1]])) {
-    if (stalk[[1]][[i]] == "x"){ #general: if i = x we want to assocate value of x .
-      # wanted to have program figure out variables for us so we dont have to define by ourselves. 
-      x <- stalk[[2]][[i]] # x is assigned to its cell value i in column value stalk[[2]]
-      x # this prints x as a check 
-      #break #breaks stop program once x is found. 
-    } else if (stalk[[1]][[i]] == "s_x"){
-      s_x <- stalk[[2]][[i]]
-    } else if (stalk[[1]][[i]] == "s_y"){
-      s_y <- stalk[[2]][[i]]
-    }
+    if (stalk[[1]][[i]] == "s_x"){ 
+        s_x <- stalk[[2]][[i]]
+      } else if (stalk[[1]][[i]] == "s_y"){
+        s_y <- stalk[[2]][[i]]
+      }
   }
-  
-  return(data.frame(entity = "Theta2", value = atan2(s_x - r_2x, s_y - r_2y)))
+  return(data.frame(entity = "Theta2", value = atan2(s_x - r_2x, s_y - r_2y))) #->> entitytest
 }
 
-E <- function(stalk) { # im excluding s for now bc idk if it should be here
-  # s = expected location, where coordinates = y + displacement and x+ displacement from the equaiton, 
-  s <- list("s_x", "s_y")
+E <- function(stalk) {
+  # s = expected location, where coordinates = y + displacement and x+ displacement from the equation, 
+    ifelse(stalk[[1]][[i]] == s, 
+           s <- stalk[[1]][stalk[1][[1]]==s], 
+           NA)
+  break
     for (i in 1:length(stalk[[1]])) {
-    if (stalk[[1]][[i]] == "x"){ #general: if i = x we want to assocate value of x .
+    if (stalk[[1]][[i]] == "x"){ #general: if i = x we want to associate value of x .
       # wanted to have program figure out variables for us so we dont have to define by ourselves. 
-      x <- stalk[[2]][[i]] # x is assigned to its cell value i in column value stalk[[2]]
-      x # this prints x as a check 
-      #break #breaks stop program once x is found. 
+      x <- stalk[[2]][[i]] 
+      # x is assigned to its cell value i in column value stalk[[2]]
     } else if (stalk[[1]][[i]] == "y"){
       y <- stalk[[2]][[i]]
     } else if (stalk[[1]][[i]] == "v_x"){
@@ -219,23 +210,35 @@ E <- function(stalk) { # im excluding s for now bc idk if it should be here
       v_y <- stalk[[2]][[i]]
     } else if (stalk[[1]][[i]] == "t"){
       t <- stalk[[2]][[i]]
-    } else if (stalk[[1]][[i]] == "s"){ # figure out if this should be here. 
-      s <- stalk[[2]][[i]] # make s a variable that is a two dim vector. 
+    }
+    return(data.frame(entity = c(s), value = c(c(x + v_x*t, y + v_y*t))))
   }
-  return(data.frame(entity = c("s"), value = c(c(x + v_x*t, y + v_y*t))) 
       # took out theta one adn theta two bc we're just getting out s. Theta one and two are predeterimed values by other fns. 
   # add s to output value if needed, Robinson said output is value = the eq but also = s_x, s_y. 
 }
 
+testE <- function(stalk){
+  for (i in 1:length(stalk[[1]])) {
+    ifelse(stalk[[1]][[i]] == s, s <- stalk[[1]][stalk[1][[1]]==s], NA)
+  }
+  return(data.frame(entity = c(s), value = c(c(x + v_x*t, y + v_y*t))))
+}
+
+babyE <- function(stalk){
+  for (i in 1:length(stalk[[1]])) {
+    s <- ifelse(stalk[[1]][[i]] == s, stalk[[2]][stalk[1][["s"]]], NA)
+    return(s)
+  }
+}
+
+ifelse((entitytest[[1]][["s"]] == c("s_x","s_y")), entitytest[[2]][entitytest[1]$entity$s], NA)
 ```
 
 
 ```{r}
 #X to U2
-#rename tab to stalk
-
-entitytest[1][[1]]=="x"|| entitytest[[1]]=="y"|| entitytest[[1]]=="z"||
-      entitytest[[1]]=="v_x" || entitytest[[1]] == "v_y"
+# This is the basic structure
+entitytest[[1]][entitytest[1][[1]]=="x"| entitytest[[1]]=="y"| entitytest[[1]]=="z"|entitytest[[1]]=="v_x" | entitytest[[1]] == "v_y"]
 
 # projections are just an identity functon. You literally just pick out the element in that.
 # This is a niave projection, so we grab first things. Other projections are diff.
@@ -259,7 +262,7 @@ U2_pr1 <- function(stalk){
   stalk[[1]][stalk[1][[1]]=="x"| stalk[[1]]=="y"| stalk[[1]]=="z"]
 }
 
-#pr1 for u3 -> v1
+#pr1 for u3 -> v1, this shouldnt work yet bc we havent figured out theta storage. 
 U3_pr1 <- function(stalk){
   stalk[[1]][stalk[1][[1]]=="Theta1"]
 }
@@ -269,13 +272,21 @@ U34_pr2 <- function(stalk){
   stalk[[1]][stalk[1][[1]]=="t"]
 }
 
-#pr1 for u4 -> v2
+#pr1 for u4 -> v2, again shiuldnt work yet.
 U4_pr1 <- function(stalk){
-  talk[[1]][stalk[1][[1]]=="Theta2"]
+  stalk[[1]][stalk[1][[1]]=="Theta2"]
 }
+```
 
-#entitytest[[1]][entitytest[1][[1]]=="x"| entitytest[[1]]=="y"| entitytest[[1]]=="z"|
-#                        entitytest[[1]]=="v_x" | entitytest[[1]] == "v_y"]
+
+Heres the thing:
+Robinson: "The entities listed in a given sensor are those that can be derived from that sensor's data. Theta1 and Theta2 can be derived from s, so you only need to store s in that particular sensor. That's what is done in the sheaf in the paper.  Perhaps this isn't the best implementation choice as far as automation goes?"
+
+```{r}
+#Now let's figure out how to handle creating the thetas:
+## Either: Create thetas from the functions that output the coordinates, and shift them to global variables inside of the original stalk
+
+
 ```
 
 
@@ -332,8 +343,8 @@ Table1 %>%
   nest(entity = entity, value = value) -> andrea
 
 
-%>%
-  nest(StalkValue = c(entity, value))-> Assignment 
+#%>%
+#  nest(StalkValue = c(entity, value))-> Assignment 
 
 
 # andrea suggested I not use the nested table, bc of how it was presenting, she suggested two different columns. 
@@ -347,7 +358,7 @@ Table1 %>%
 ```{r}
 
 SixB %>%
-  left_join(andrea, by = c(SSource = "Key")) -> SixB2 # or andrea/assigmnt
+  left_join(andrea, by = c(SSource = "Key")) -> SixB2 # or andrea/Assigmnt
 
 SixB2 %>%
   mutate(StalkOutput = invoke_map(.f = DMap, .x = entity))
@@ -356,7 +367,7 @@ SixB %>%
   left_join(Assignment, by = c(SSource = "Key"))%>%
   mutate(StalkOutput = map2(DMap,StalkValue,  ~ .x(.y)))
 # not a dim prob. 
-#this should run. 
+#this should run when everything else works...
 
 ```
 
