@@ -63,7 +63,8 @@ B <- function(stalk) {
   r_2y <- 38.935
   
     stalk %>%
-      mutate(Theta2=atan2(x + v_x*t - r_2x, y + v_y*t - r_2y))
+      mutate(Theta2=atan2(x + v_x*t - r_2x, y + v_y*t - r_2y)) %>%
+      select(Theta2, t)
 }
 ```
 
