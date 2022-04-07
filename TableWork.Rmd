@@ -118,7 +118,7 @@ A <- function(stalk) {
   r_1y <- 42.733838
   
     for (i in 1:length(stalk[[1]])) {
-    if (stalk[[1]][[i]] == "x"){ #general: if i = x we want to assocate value of x .
+    if (stalk[[1]][[i]] == "x"){ #general: if i = x we want to associate value of x .
       # wanted to have program figure out variables for us so we dont have to define by ourselves. 
       x <- stalk[[2]][[i]] # x is assigned to its cell value i in column value stalk[[2]]
       x # this prints x as a check 
@@ -143,7 +143,7 @@ B <- function(stalk) {
   r_1y <- 42.733838
 
   for (i in 1:length(stalk[[1]])) {
-    if (stalk[[1]][[i]] == "x"){ #general: if i = x we want to assocate value of x .
+    if (stalk[[1]][[i]] == "x"){ #general: if i = x we want to associate value of x .
       # wanted to have program figure out variables for us so we dont have to define by ourselves. 
       x <- stalk[[2]][[i]] # x is assigned to its cell value i in column value stalk[[2]]
       x # this prints x as a check 
@@ -324,6 +324,52 @@ If you have the same set of entities you have the same sensors:
 
 #alter > ncol(SixB)
 ```
+
+
+
+
+
+
+
+
+```{r}
+tibble(x=70.649,y=42.753,z=11220,v_x=-495,v_y=164,t=0.928,s_x=1.23e-2,s_y=1.23e+3) -> stalk
+r_1x <- -73.662574
+r_1y <- 42.733838
+
+stalk %>% 
+  mutate(theta1=atan2(s_x - r_1x, s_y - r_1y)) %>%
+  select(theta1)
+```
+
+
+```{r}
+tibble(location=tibble(x=70.649,y=42.753,z=11220),
+       velocity=tibble(x=-495,y=164),
+       t=0.928,
+       s=tibble(x=1.23e-2,y=1.23e+3)) -> stalk2
+
+stalk2 %>% mutate(theta1=atan2(s$x - r_1x, s$y - r_1y)) %>% select(theta1)
+
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
