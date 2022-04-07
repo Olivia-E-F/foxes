@@ -1,0 +1,259 @@
+---
+title: "RedoTable"
+author: "Olivia Freides"
+date: "3/23/2022"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# Modeling Robinson's SheafCanon Sheaf:
+
+For specifics and citations, reference https://arxiv.org/abs/1603.01446
+
+Robinson, Michael. “Sheaves Are the Canonical Data Structure for Sensor Integration.” Information Fusion, vol. 36, Elsevier B.V, 2017, pp. 208–24, https://doi.org/10.1016/j.inffus.2016.12.002.
+
+
+```{r}
+library(tidyverse)
+```
+
+
+```{r Table 1}
+Table1 <- read.csv("Assignment2.csv") # Copied Table 1, page 218.
+Table1
+```
+
+```{r Global Vars?}
+#Should these be global variables?
+r_1x <- -73.662574
+r_1y <- 42.733838
+r_2x <- -77.0897
+r_2y <- 38.935
+```
+
+What should be done with variables outside of the assignment table that we need? Constraints for functions not in any assignment table...
+
+## Restriction Functions:
+Page 214: s_x, s_y are coordinates of an object detected in the satellite image, r_1x, r_1y are coordinates of the first RDF sensor and r_2x, r_2y are coordinates of the second RDF sensor. 
+
+$$A(x, y, z, v_x, v_y, t) = \bigg(tan^{-1}\frac{x+v_xt-r_{1x}}{y+v_yt-r_{1y}}, t\bigg)$$
+
+```{r Functions A}
+A <- function(stalk) {
+  r_1x <- -73.662574
+  r_1y <- 42.733838
+
+  stalk %>%
+    mutate(Theta1=atan2(x + v_x*t - r_1x, y + v_y*t - r_1y)) %>%
+    select(Theta1, t)
+  
+}
+```
+
+
+$$B(x, y, z, v_x, v_y, t) = \bigg(tan^{-1}\frac{x+v_xt-r_{2x}}{y+v_yt-r_{2y}}, t\bigg)$$
+
+```{r Functions B}
+B <- function(stalk) {
+  r_2x <- -77.0897
+  r_2y <- 38.935
+  
+    stalk %>%
+      mutate(Theta2=atan2(x + v_x*t - r_2x, y + v_y*t - r_2y))
+}
+```
+
+
+$$C(s_x, s_y) = tan^{-1}\frac{s_x-r_{1x}}{s_y-r_{1y}}$$
+
+```{r Functions C}
+C <- function(stalk) {
+  r_1x <- -73.662574
+  r_1y <- 42.733838
+
+  stalk %>%
+    mutate(Theta1=atan2(s_x - r_1x, s_y - r_1y)) %>%
+    select(c(Theta1))
+}
+```
+
+
+$$D(s_x, s_y) = tan^{-1}\frac{s_x-r_{2x}}{s_y-r_{2y}}$$
+
+
+```{r Functions D}
+D <- function(stalk){
+  r_2x <- -77.0897
+  r_2y <- 38.935
+
+  stalk %>%
+    mutate(Theta2=atan2(s_x - r_2x, s_y - r_2y)) %>%
+    select(c(Theta2))
+}
+```
+
+$$E(x, y, z, v_x, v_y, t) = (x+v_xt, y+v_yt)$$
+
+
+```{r Functions E}
+E <- function(stalk) {
+  # s = expected location, where coordinates = y + displacement and x+ displacement from the equation, 
+    stalk %>%
+      mutate(s_x = c(x + v_x*t), s_y = c(y + v_y*t)) %>%
+      select(c(s_x, s_y))
+}
+
+```
+
+
+
+### Check Example 15:
+```{r Functions Projection 1}
+pr1xpr2 <- function(stalk){ 
+  stalk %>%
+      select(c(x, y, z, v_x, v_y))
+}
+```
+
+
+```{r Functions }
+#pr1 for u2 -> u1
+U2_pr1 <- function(stalk){
+  stalk %>%
+  select(c(x, y, z))
+}
+
+#pr1 for u3 -> v1, this shouldnt work yet bc we havent figured out theta storage. 
+U3_pr1 <- function(stalk){
+  stalk %>%
+      select(c(Theta1))
+}
+
+#pr2 for u3 -> v3
+U3_pr2 <- function(stalk){
+  stalk %>%
+      select(c(t))
+}
+
+#pr1 for u4 -> v2, again shiuldnt work yet.
+U4_pr1 <- function(stalk){
+  stalk %>%
+      select(c(Theta2))
+}
+
+
+#Problems: ID function should Select its own column?
+```
+
+
+
+
+```{r Functions Identities}
+ID <- function(stalk){
+  stalk
+}
+
+IDU1 <- function(stalk){
+  stalk %>%
+    select(U1)
+}
+
+IDU2 <- function(stalk){
+  stalk %>%
+    select(U2)
+}
+
+IDU3 <- function(stalk){
+  stalk %>%
+    select(U3)
+}
+
+IDU4 <- function(stalk){
+  stalk %>%
+    select(U4)
+}
+
+IDU5 <- function(stalk){
+  stalk %>%
+    select(U5)
+}
+
+#V1 = THETA1, V2=THETA2, V3=T
+
+IDV1 <- function(stalk){
+  stalk %>%
+      select(c(Theta1))
+}
+IDV2 <- function(stalk){
+  stalk %>%
+      select(c(Theta2))
+}
+
+IDV3 <- function(stalk){
+  stalk %>%
+      select(c(t))
+}
+
+```
+
+
+Table representation of Figure 6 (b), page 214:
+
+![Figure 6](sheafcanon6ab.png)
+
+
+```{r Table 6B}
+SixB <- tibble(SSource = c("X", "X", "X", "X", "U2", "U3", "U3" , "U5", "U5", "U4",
+                               "U4", "X", "U1", "U2", "U3", "U4", "U5", "V1", "V2", "V3"), 
+                   SDest = (c("U2", "U3", "U5", "U4", "U1", "V1", "V3","V1", "V2",
+                              "V3", "V2","X", "U1", "U2", "U3", "U4", "U5", "V1", "V2","V3")),
+                   DMap = c(pr1xpr2, A, E, B, U2_pr1, U3_pr1, U34_pr2, C, D, U34_pr2,
+                           U4_pr1, ID, ID, ID, ID, ID, ID, ID, ID, ID))
+
+#ID maps w functions and SSource+SDest =.
+```
+
+
+```{r}
+Table1 %>%
+  select(entity, Case1, Key) %>%
+  pivot_wider(names_from = entity, values_from = Case1) %>%
+  right_join(SixB, by = c(Key = "SSource")) %>%
+  nest(stalkinput = 2:12) %>%
+  mutate(stalkoutput = map2(.x= DMap, .y = stalkinput, .f = exec)) -> FinSheaf
+
+FinSheaf
+
+```
+
+
+Consistency Radius: radius=ish sd/var of stalkoutputs/ diameter of stalkoutputs. Coord. comp
+Unnest. pivot wider, aggregate along all of the columns. UNNESTWIDER
+Put the STD together, remember units are diff
+chi square, norm. var. 
+Ideally have user supply aggregation function. 
+
+process below should be a specific function, so to optimize consistency radius. best consistency radius function like lm() taking consistency radius function.
+
+```{r}
+FinSheaf %>%
+  group_by(SDest) %>%
+  summarise(rad = ) # have pre-consistency radii , un-group and aggregate all rads to get consistency radius.
+# ends with: for each stalk you have a radius, then aggregate them, max, sum of squares. 
+```
+
+
+### Testing:
+
+```{r}
+#Option 7: Lets look at this first:
+
+Table1 %>%
+  mutate(label = str_c(Sensor, ".", entity))%>%
+  select(label, Case1, Key)%>%
+  pivot_wider(names_from = label, values_from = Case1)
+```
