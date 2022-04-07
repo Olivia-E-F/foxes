@@ -1,7 +1,7 @@
 ---
-title: "RedoTable"
+title: "SheafCanon_OF"
 author: "Olivia Freides"
-date: "3/23/2022"
+date: "4/06/2022"
 output: pdf_document
 ---
 
@@ -98,10 +98,10 @@ D <- function(stalk){
 
 $$E(x, y, z, v_x, v_y, t) = (x+v_xt, y+v_yt)$$
 
-
+ s = expected location, where coordinates = y + displacement and x+ displacement from the equation 
+ 
 ```{r Functions E}
 E <- function(stalk) {
-  # s = expected location, where coordinates = y + displacement and x+ displacement from the equation, 
     stalk %>%
       mutate(s_x = c(x + v_x*t), s_y = c(y + v_y*t)) %>%
       select(c(s_x, s_y))
@@ -112,92 +112,131 @@ E <- function(stalk) {
 
 
 ### Check Example 15:
-```{r Functions Projection 1}
+```{r Functions Proj 1}
 pr1xpr2 <- function(stalk){ 
   stalk %>%
       select(c(x, y, z, v_x, v_y))
 }
 ```
 
+pr1 for u2 -> u1
 
-```{r Functions }
-#pr1 for u2 -> u1
+```{r Functions Proj 2}
 U2_pr1 <- function(stalk){
   stalk %>%
   select(c(x, y, z))
 }
+```
 
-#pr1 for u3 -> v1, this shouldnt work yet bc we havent figured out theta storage. 
+pr1 for u3 -> v1
+
+```{r Functions Proj 3}
 U3_pr1 <- function(stalk){
   stalk %>%
       select(c(Theta1))
 }
+```
 
-#pr2 for u3 -> v3
+pr2 for u3 -> v3
+
+```{r Functions Proj 4}
 U3_pr2 <- function(stalk){
   stalk %>%
       select(c(t))
 }
+```
 
-#pr1 for u4 -> v2, again shiuldnt work yet.
+pr1 for u4 -> v2
+
+```{r Functions Proj 5}
 U4_pr1 <- function(stalk){
   stalk %>%
       select(c(Theta2))
 }
-
-
-#Problems: ID function should Select its own column?
 ```
 
+pr1 for u4 -> v3
 
-
-
-```{r Functions Identities}
-ID <- function(stalk){
-  stalk
-}
-
-IDU1 <- function(stalk){
-  stalk %>%
-    select(U1)
-}
-
-IDU2 <- function(stalk){
-  stalk %>%
-    select(U2)
-}
-
-IDU3 <- function(stalk){
-  stalk %>%
-    select(U3)
-}
-
-IDU4 <- function(stalk){
-  stalk %>%
-    select(U4)
-}
-
-IDU5 <- function(stalk){
-  stalk %>%
-    select(U5)
-}
-
-#V1 = THETA1, V2=THETA2, V3=T
-
-IDV1 <- function(stalk){
-  stalk %>%
-      select(c(Theta1))
-}
-IDV2 <- function(stalk){
-  stalk %>%
-      select(c(Theta2))
-}
-
-IDV3 <- function(stalk){
+```{r Functions Proj 6}
+U4_pr2 <- function(stalk){
   stalk %>%
       select(c(t))
 }
 
+```
+
+
+## ID function return itself, refer to image for components. 
+
+```{r Functions Identity X}
+ID_X <- function(stalk){
+  stalk %>%
+    select(c(x, y, z, v_x, v_y, s_x, s_y, t, Theta1, Theta2))
+}
+```
+
+
+```{r Functions Identity U1}
+ID_U1 <- function(stalk){
+  stalk %>%
+    select(c(x, y, z))
+}
+```
+
+
+```{r Functions Identity U2}
+ID_U2 <- function(stalk){
+  stalk %>%
+    select(c(x, y, z, v_x, v_y))
+}
+```
+
+
+```{r Functions Identity U3}
+ID_U3 <- function(stalk){
+  stalk %>%
+    select(c(Theta1, t))
+}
+```
+
+
+```{r Functions Identity U4}
+ID_U4 <- function(stalk){
+  stalk %>%
+    select(c(Theta2, t))
+}
+```
+
+
+```{r Functions Identity U5}
+ID_U5 <- function(stalk){
+  stalk %>%
+    select(c(s_x, s_y, Theta1, Theta2))
+}
+```
+
+
+```{r Functions Identity V1}
+ID_V1 <- function(stalk){
+  stalk %>%
+      select(c(Theta1))
+}
+```
+
+
+```{r Functions Identity V2}
+ID_V2 <- function(stalk){
+  stalk %>%
+      select(c(Theta2))
+}
+```
+
+
+```{r Functions V3}
+ID_V3 <- function(stalk){
+  stalk %>%
+      select(c(t))
+}
 ```
 
 
@@ -207,16 +246,19 @@ Table representation of Figure 6 (b), page 214:
 
 
 ```{r Table 6B}
-SixB <- tibble(SSource = c("X", "X", "X", "X", "U2", "U3", "U3" , "U5", "U5", "U4",
-                               "U4", "X", "U1", "U2", "U3", "U4", "U5", "V1", "V2", "V3"), 
-                   SDest = (c("U2", "U3", "U5", "U4", "U1", "V1", "V3","V1", "V2",
-                              "V3", "V2","X", "U1", "U2", "U3", "U4", "U5", "V1", "V2","V3")),
-                   DMap = c(pr1xpr2, A, E, B, U2_pr1, U3_pr1, U34_pr2, C, D, U34_pr2,
-                           U4_pr1, ID, ID, ID, ID, ID, ID, ID, ID, ID))
+SixB <- tibble(SSource = c("X", "X", "X", "X", "U2", "U3", "U3", "U5", "U5", "U4", 
+                           "U4", "X", "U1", "U2", "U3", "U4", "U5", "V1", "V2", "V3"), 
+               SDest =  c("U2", "U3", "U5", "U4", "U1", "V1", "V3", "V1", "V2", "V3",
+                          "V2", "X", "U1", "U2", "U3", "U4", "U5", "V1", "V2","V3"),
+               DMap = c(pr1xpr2, A, E, B, U2_pr1, U3_pr1, U3_pr2, C, D, U4_pr2,
+                        U4_pr1, ID_X, ID_U1, ID_U2, ID_U3, ID_U4, ID_U5, ID_V2, 
+                        ID_V2, ID_V3))
 
 #ID maps w functions and SSource+SDest =.
 ```
 
+
+Note: exec takes the function in .x and runs with input .y
 
 ```{r}
 Table1 %>%
@@ -224,7 +266,7 @@ Table1 %>%
   pivot_wider(names_from = entity, values_from = Case1) %>%
   right_join(SixB, by = c(Key = "SSource")) %>%
   nest(stalkinput = 2:12) %>%
-  mutate(stalkoutput = map2(.x= DMap, .y = stalkinput, .f = exec)) -> FinSheaf
+  mutate(stalkoutput = map2(.x= DMap, .y = stalkinput, .f = exec)) -> FinSheaf 
 
 FinSheaf
 
@@ -240,17 +282,18 @@ Ideally have user supply aggregation function.
 process below should be a specific function, so to optimize consistency radius. best consistency radius function like lm() taking consistency radius function.
 
 ```{r}
-FinSheaf %>%
-  group_by(SDest) %>%
-  summarise(rad = ) # have pre-consistency radii , un-group and aggregate all rads to get consistency radius.
+#FinSheaf %>%
+# group_by(SDest) %>%
+# summarize(rad = ) # have pre-consistency radii , un-group and aggregate all rads to 
+# get consistency radius.
 # ends with: for each stalk you have a radius, then aggregate them, max, sum of squares. 
 ```
 
 
-### Testing:
+### Relevant Testing:
 
 ```{r}
-#Option 7: Lets look at this first:
+# Keep in mind when pivoting for consistency rad.
 
 Table1 %>%
   mutate(label = str_c(Sensor, ".", entity))%>%
