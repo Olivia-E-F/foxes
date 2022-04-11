@@ -283,13 +283,37 @@ Ideally have user supply aggregation function.
 process below should be a specific function, so to optimize consistency radius. best consistency radius function like lm() taking consistency radius function.
 
 ```{r}
-#FinSheaf %>%
-# group_by(SDest) %>%
-# summarize(rad = ) # have pre-consistency radii , un-group and aggregate all rads to 
+FinSheaf %>%
+  group_by(SDest) %>%
+  unnest(stalkoutput)
+# have pre-consistency radii , un-group and aggregate all rads to 
 # get consistency radius.
 # ends with: for each stalk you have a radius, then aggregate them, max, sum of squares. 
 ```
 
+
+# Questions:
+
+Consistency radius vs consistency filtration?
+From PNLL+Robinson paper
+
+Joslyn, Cliff A., et al. “A Sheaf Theoretical Approach to Uncertainty Quantification of Heterogeneous Geolocation Information.” Sensors (Basel, Switzerland), vol. 20, no. 12, MDPI, 2020, p. 3418–, https://doi.org/10.3390/s20123418.
+
+The consistency radius (more fully developed by Robinson [2] in later work) provides a native global measure of the uncertainty among the sensors present in any reading. Beyond that, the consistency filtration provides a detailed breakdown of the contributions of particular sensors and sensor combinations to that overall uncertainty.
+
+$$\epsilon^* = max \; d_u((S(U \subset$$
+
+Small means min. disagreement among observations, large some sensors disagree.
+
+Per Pysheaf: Computes the error between the data assignments and extended assignments on the sheaf
+      :param numpyNormType: Optional, how the errors across the sheaf are combined.
+      default is take maximum error.
+      :param cellStartIndices: Optional, which cells may start the data flowed into 
+      this cell
+      :returns: Error between the data assignments and extended assignments on the 
+      sheaf
+
+norm(differences in assignment?)
 
 ### Relevant Testing:
 
