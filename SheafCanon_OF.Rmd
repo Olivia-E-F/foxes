@@ -295,13 +295,39 @@ FinSheaf %>%
 # Questions:
 
 Consistency radius vs consistency filtration?
+
 From PNLL+Robinson paper
 
 Joslyn, Cliff A., et al. “A Sheaf Theoretical Approach to Uncertainty Quantification of Heterogeneous Geolocation Information.” Sensors (Basel, Switzerland), vol. 20, no. 12, MDPI, 2020, p. 3418–, https://doi.org/10.3390/s20123418.
 
 The consistency radius (more fully developed by Robinson [2] in later work) provides a native global measure of the uncertainty among the sensors present in any reading. Beyond that, the consistency filtration provides a detailed breakdown of the contributions of particular sensors and sensor combinations to that overall uncertainty.
 
-$$\epsilon^* = max \; d_u((S(U \subset$$
+Pseudometric: function that takes in 2 elements of a set, produces a non negtive real number.
+d_u is a pseudometric. 
+
+Maximum aggregation variant:
+Note: \mathcal{} marking sheaves and collections of subsets. :)
+Supremum vs Max:
+- Least of upper bounds
+vs
+- The biggest one
+-1/x x>0, always a negative number. Any positive is an upper bound. Least of upper bounds is zero. SUP = 0, Max = ND.
+In practice, MAX.
+
+$$c_{\mathcal{S}}(a) := \sup_{U \subseteq V \in \mathcal{T}} \; d_U((\mathcal{S}(U \subseteq V)) a(V), a(U))$$
+^ Sensitive to outliers. Better for theorem proving.
+d_U is a fn, the pseud. produces real num. 
+
+Norm: input element of set, produces non neg real num. 
+
+Stalk outputs: $\mathcal{S}(U \subseteq V)) a(V)$
+
+Lest squares aggregation variant:
+$$c_{\mathcal{S}}(a) := \sqrt{\sum_{U \subseteq V \in \mathcal{T}} \; d_u((\mathcal{S}(U \subseteq V)) a(V), a(U))^2}$$
+
+^Less sensitive to outliers
+
+Every norm on $\mathbb{R}^n$ has an associated consistency radius. 
 
 Small means min. disagreement among observations, large some sensors disagree.
 
