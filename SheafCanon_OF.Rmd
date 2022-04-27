@@ -275,7 +275,7 @@ FinSheaf
 
 
 Consistency Radius: radius=ish sd/var of stalkoutputs/ diameter of stalkoutputs. Coord. comp
-Unnest. pivot wider, aggregate along all of the columns. UNNESTWIDER
+Unnest, aggregate along all of the columns. 
 Put the STD together, remember units are diff
 chi square, norm. var. 
 Ideally have user supply aggregation function. 
@@ -285,10 +285,38 @@ process below should be a specific function, so to optimize consistency radius. 
 ```{r}
 FinSheaf %>%
   group_by(SDest) %>%
-  unnest(stalkoutput)
+  unnest(stalkoutput) %>%
+  ungroup() %>%
+  mutate(ConsRad = summarise(across(5:14, ~ sd(.,na.rm = TRUE)))) # I summarized bc I just wanted 1, gives new DF though. 
+
+FinSheaf %>%
+  group_by(SDest) %>%
+  unnest(stalkoutput) %>%
+  ungroup() %>%
+  mutate(sd = across(5:14, ~ sd(.,na.rm = TRUE)))%>%
+  mutate(ConsRad = )
+
+
 # have pre-consistency radii , un-group and aggregate all rads to 
 # get consistency radius.
 # ends with: for each stalk you have a radius, then aggregate them, max, sum of squares. 
+
+mtcars %>%
+  summarise(across(.cols = mpg:gear, .fns = ~sd(.)))
+mtcars %>%
+  mutate(sd = across(.cols = mpg:gear, .fns = ~sd(.))) -> looktest
+
+```
+
+??? First part of Du{} ???
+Dmap applied on assignment? or just stalkouput?
+
+```{r}
+# #Need sheaf and assignment as easy to get things within the df.. I need an assignment table.
+# consistrad <- function(sheaf, assignment){
+#   sheaf %>% select(stalkoutput)
+#     
+# }
 ```
 
 
