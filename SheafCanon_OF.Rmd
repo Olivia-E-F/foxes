@@ -42,6 +42,8 @@ Page 214: s_x, s_y are coordinates of an object detected in the satellite image,
 
 $$A(x, y, z, v_x, v_y, t) = \bigg(tan^{-1}\frac{x+v_xt-r_{1x}}{y+v_yt-r_{1y}}, t\bigg)$$
 
+## Functions for DMAP  
+
 ```{r Functions A}
 A <- function(stalk) {
   r_1x <- -73.662574
@@ -112,7 +114,8 @@ E <- function(stalk) {
 
 
 
-### Check Example 15:
+Check Example 15:
+
 ```{r Functions Proj 1}
 pr1xpr2 <- function(stalk){ 
   stalk %>%
@@ -166,8 +169,7 @@ U4_pr2 <- function(stalk){
 
 ```
 
-
-## ID function return itself, refer to image for components. 
+\textbf{ID function return itself, refer to image for components.}
 
 ```{r Functions Identity X}
 ID_X <- function(stalk){
@@ -241,7 +243,9 @@ ID_V3 <- function(stalk){
 ```
 
 
-Table representation of Figure 6 (b), page 214:
+
+
+## Table representation of Figure 6 (b), page 214:
 
 ![Figure 6](sheafcanon6ab.png)
 
@@ -274,7 +278,9 @@ FinSheaf
 ```
 
 
-Consistency Radius: radius=ish sd/var of stalkoutputs/ diameter of stalkoutputs. Coord. comp
+## Consistency Radius: 
+
+radius=ish sd/var of stalkoutputs/ diameter of stalkoutputs. Coord. comp
 Unnest, aggregate along all of the columns. 
 Put the STD together, remember units are diff
 chi square, norm. var. 
@@ -282,34 +288,60 @@ Ideally have user supply aggregation function.
 
 process below should be a specific function, so to optimize consistency radius. best consistency radius function like lm() taking consistency radius function.
 
+$$d_U(x,y) = \sqrt{\sum_{i \in columns} \frac{A_i}{ncol} | x_i - y_i| ^2}$$
+A is the unit conversion.
+
 ```{r}
+UnitScale <- tibble(variable = c("x", "y", "z", "v_x", "v_y", "t", "Theta1", "Theta2", "s_x", "s_y"),
+                      scale = c(1, 1, 1, 1, 1, 1, 1, 1, 1, 1)) # Scaling units
+
+SensorScale <- FinSheaf %>% count(SDest) # Scaling Sensors, by n?
+
+# DUAL CONS. RAD.
+#1st way: sumarize everything at once using euclidean norms
 FinSheaf %>%
   group_by(SDest) %>%
   unnest(stalkoutput) %>%
+  summarise(across(4:13, ~ var(.,na.rm = TRUE))) %>%
+  pivot_longer(cols = 2:11, names_to = "variable", values_to = "stalk") %>%
+  filter(!is.na(stalk)) %>%
+  left_join(UnitScale, by = c(variable = "variable")) %>%
+  mutate(ScaleValue = stalk*scale) %>% # conversion factor applied
   ungroup() %>%
-  mutate(ConsRad = summarise(across(5:14, ~ sd(.,na.rm = TRUE)))) # I summarized bc I just wanted 1, gives new DF though. 
+  summarise(ConsistRad = sd(ScaleValue)) # should be a single number.
 
+#2nd way: 2-stpe sumarization 
+# No stabilization of grouping...
+#left join in weighted 
 FinSheaf %>%
   group_by(SDest) %>%
   unnest(stalkoutput) %>%
-  ungroup() %>%
-  mutate(sd = across(5:14, ~ sd(.,na.rm = TRUE)))%>%
-  mutate(ConsRad = )
+  summarise(across(4:13, ~ var(.,na.rm = TRUE))) %>%
+  pivot_longer(cols = 2:11, names_to = "variable", values_to = "stalk") %>%
+  filter(!is.na(stalk)) %>%
+  left_join(UnitScale, by = c(variable = "variable")) %>%
+  mutate(ScaleValue = stalk*scale) %>% # conversion factor applied
+  group_by(SDest)%>%
+  summarise(ConsistRad = sd(ScaleValue)) %>%
+  mutate(ConsistRad = if_else(is.na(ConsistRad), 0, ConsistRad)) %>%
+  left_join(SensorScale, by = c(SDest = "SDest")) %>%
+  mutate(ConsistRad = ConsistRad*(n-1)) %>%
+  summarise(ConsistRad = sd(ConsistRad))# should be a single number.
+#variances add. SD's dont. 
 
+#Unit Conversions:
 
 # have pre-consistency radii , un-group and aggregate all rads to 
 # get consistency radius.
 # ends with: for each stalk you have a radius, then aggregate them, max, sum of squares. 
 
-mtcars %>%
-  summarise(across(.cols = mpg:gear, .fns = ~sd(.)))
-mtcars %>%
-  mutate(sd = across(.cols = mpg:gear, .fns = ~sd(.))) -> looktest
 
 ```
 
 ??? First part of Du{} ???
 Dmap applied on assignment? or just stalkouput?
+
+
 
 ```{r}
 # #Need sheaf and assignment as easy to get things within the df.. I need an assignment table.
@@ -369,7 +401,10 @@ Per Pysheaf: Computes the error between the data assignments and extended assign
 
 norm(differences in assignment?)
 
-### Relevant Testing:
+
+
+
+# Relevant Testing:
 
 ```{r}
 # Keep in mind when pivoting for consistency rad.
@@ -378,4 +413,53 @@ Table1 %>%
   mutate(label = str_c(Sensor, ".", entity))%>%
   select(label, Case1, Key)%>%
   pivot_wider(names_from = label, values_from = Case1)
+
+
 ```
+
+```{r}
+FinSheaf %>%
+  group_by(SDest) %>%
+  unnest(stalkoutput) %>%
+  summarise(across(4:13, ~ var(.,na.rm = TRUE))) -> Testsheaf
+
+# have pre-consistency radii , un-group and aggregate all rads to 
+# get consistency radius.
+# ends with: for each stalk you have a radius, then aggregate them, max, sum of squares. 
+
+mtcars %>%
+  summarise(across(.cols = mpg:gear, .fns = ~sd(.)))
+
+# mutate(diff = across(stalkoutput,  ~lead(.x) - (.x)))
+
+
+```
+
+Make one cons. rad:
+```{r}
+#du(S(U5 subset X)(a(x)), a(U5)) = (output of dmap x to u5, ID output)
+# take in:
+FinSheaf %>% filter(SDest == "U1")%>% mutate(diff = across(c(x,y,z),  ~lead(.x) - (.x)))
+# or reduce(x, "-")) 
+# doesnt work but i want it to. 
+
+
+TestSheaf %>% filter(SDest == "U1")%>% mutate(diff = x[1]-x[2])
+# works but uses idnexing :(
+
+
+TestSheaf %>% mutate(diff = .[SDest == "U1",] - .[Key == "U2",])
+# Doesnt work but i want it to. -> if you can just run through pairs of sdests and jeys
+
+FinSheaf%>% 
+  filter(SDest == "U1") %>%
+  pivot_wider(stalkoutput, id_cols = c(Key, SDest))
+
+
+  mutate(diff = across(stalkoutput,  ~lead(.x) - (.x)))
+
+
+  
+```
+
+
