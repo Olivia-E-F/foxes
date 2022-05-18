@@ -295,14 +295,18 @@ A is the unit conversion.
 
 We converted everything to radians. 
 
+Unit Conversions
+
 ```{r}
 UnitScale <- tibble(variable = c("x", "y", "z", "v_x", "v_y", "t", "Theta1", "Theta2", "s_x", "s_y"),
                       scale = c(1*110.567*cos(43*pi/180), 1*110.567, 1/1000, 1, 1, 1, pi/180, pi/180, 1*110.567*cos(43*pi/180), 1*110.567)) # Scaling units
 
 SensorScale <- FinSheaf %>% count(SDest) # Scaling Sensors, by n?
+```
 
-# DUAL CONS. RAD.
-#1st way: summarize everything at once using euclidean norms
+
+```{r}
+#Consistency Variance
 FinSheaf %>%
   group_by(SDest) %>%
   unnest(stalkoutput)%>%
@@ -310,30 +314,27 @@ FinSheaf %>%
   pivot_longer(cols = 2:11, names_to = "variable", values_to = "stalk") %>%
   filter(!is.na(stalk)) %>%
   left_join(UnitScale, by = c(variable = "variable")) %>%
-  mutate(ScaleValue = stalk*scale) %>% # conversion factor applied
+  mutate(ScaleValue = n()*stalk*scale^2) %>% # conversion factor applied
   ungroup() %>%
-  summarise(ConsistRad = sd(ScaleValue)) # should be a single number.
+  summarise(ConsistVar = sd(ScaleValue)) %>% # should be a single number.
+  sqrt()
 
-#2nd way: 2-step summarization
-# No stabilization of grouping...
-#left join in weighted 
+
 FinSheaf %>%
   group_by(SDest) %>%
-  unnest(stalkoutput) %>%
-  summarise(across(4:13, ~ var(.,na.rm = TRUE))) %>%
+  unnest(stalkoutput)%>%
+  summarise(across(4:13, ~ n()*var(.,na.rm = TRUE))) %>%
   pivot_longer(cols = 2:11, names_to = "variable", values_to = "stalk") %>%
   filter(!is.na(stalk)) %>%
   left_join(UnitScale, by = c(variable = "variable")) %>%
-  mutate(ScaleValue = stalk*scale) %>% # conversion factor applied
-  group_by(SDest)%>%
-  summarise(ConsistRad = sd(ScaleValue)) %>%
-  mutate(ConsistRad = if_else(is.na(ConsistRad), 0, ConsistRad)) %>%
-  left_join(SensorScale, by = c(SDest = "SDest")) %>%
-  mutate(ConsistRad = ConsistRad*(n-1)) %>%
-  summarise(ConsistRad = sd(ConsistRad))# should be a single number.
+  mutate(ScaleValue = stalk*scale^2) %>% # conversion factor applied
+  ungroup() %>%
+  summarise(ConsistSD = sqrt(sum(ScaleValue)))
+```
 
 
-#Final Consist. Rad
+```{r}
+#Consistency Radius
 FinSheaf %>%
   group_by(SDest) %>%
   unnest(stalkoutput)%>%
