@@ -70,12 +70,18 @@ $$\phi: \mathbb{R}^5 \to \mathbb{R}^5, \phi((x, y, z, r, \theta)^T) = (x, y, z, 
 
 ![Figure 3](GeoFigure3.png)
 
+# UPDATE MODEL:
+X, Z, H -> R2. Z coord not available from openstreet text. Now X, Z, H =  (x, y).
+
 Step 1:  
 ## Restriction Functions:
 
-Since the pairwise relations all share UTM coordinates, only id mappings are needed amongst them up to the three-way H face.  
 
 IDs \textbf{ID function return itself, refer to image for components.}
+
+Since the pairwise relations all share UTM coordinates, only ID mappings are needed among them -- up to the three-way H face.
+
+In total there are 12 ID functions. 
 
 ```{r Functions Identity V}
 ID_V <- function(stalk){
@@ -108,7 +114,7 @@ ID_G <- function(stalk){
 ```{r Functions Identity X}
 ID_X <- function(stalk){
   stalk %>%
-    select(c(x, y, z))
+    select(c(x, y))
 }
 ```
 
@@ -122,7 +128,7 @@ ID_Y <- function(stalk){
 ```{r Functions Identity Z}
 ID_Z <- function(stalk){
   stalk %>%
-    select(c(x, y, z))
+    select(c(x, y))
 }
 ```
 
@@ -136,27 +142,28 @@ ID_B <- function(stalk){
 ```{r Functions Identity H}
 ID_H <- function(stalk){
   stalk %>%
-    select(c(x, y, z)) 
+    select(c(x, y)) 
 }
 ```
 
-**** What are these again: ? ****
-
-```{r Functions ID YH}
+```{r Functions Identity YH}
 ID_YH <- function(stalk){
-  #ID Function for the face? 
+  stalk %>%
+    select(c(x, y)) 
 }
 ```
 
-```{r Functions ID ZH}
+```{r Functions Identity ZH}
 ID_ZH <- function(stalk){
-  #ID Function for the face? 
+  stalk %>%
+    select(c(x, y)) 
 }
 ```
 
-```{r Functions ID XH}
+```{r Functions Identity XH}
 ID_XH <- function(stalk){
-  #ID Function for the face? 
+  stalk %>%
+    select(c(x, y)) 
 }
 ```
 
@@ -169,10 +176,10 @@ https://inbo.github.io/tutorials/tutorials/spatial_crs_coding/
 
 ```{r}
 #Testing
-SP <- SpatialPoints(cbind(-82.6,35.6, 2019),
+SP <- SpatialPoints(cbind(-82.6,35.6 , 2019),
                     proj4string=CRS("+proj=longlat"))
 
-spTransform(SP, CRS("+proj=utm +zone=17 +datum=WGS84")) # How to know how to specify zone...
+spTransform(SP, CRS("+proj=utm +zone=17 +datum=WGS84")) # Get zone by lat long to utm.
 
 Table %>% filter(key == "Z")
 Table %>% filter(key == "V") %>% select(case1) -> coords
@@ -187,11 +194,11 @@ spTransform(im, CRS("+proj=utm +zone=17 +datum=WGS84"))
 
 ToUTM <- function(stalk){
   coordsNA <- c()
-  Table %>% filter(key == "Z") %>% select(case1) -> coords
+  Table %>% filter(key == "V") %>% select(case1) -> coords
   coordsNA$Latitude <- as.numeric(coords$case1[1])
   coordsNA$Longitude <- as.numeric(coords$case1[2])
   coordinates(coordsNA) -> coordssite
-  SpatialPoints(coordssite, proj4string = CRS("+proj=longlat")) -> llcoords # makes s4
+  SpatialPoints(coordssite, proj4string = CRS("+proj=longlat +ellps=WGS84")) -> llcoords # makes s4
   spTransform(llcoords, CRS("+proj=utm +zone=17 +datum=WGS84")) -> tcoords
   print(tcoords)
 
@@ -201,23 +208,30 @@ ToUTM(Table)
 
 ```{r}
 UTM_VX <- function(stalk){
-  stalk %>%
-    select(c()) #utm for v coords lat long utm
-} # last step in test coords.
-
+  coordsNA <- c() # init matrix
+  coordsNA$x <- as.numeric(stalk$long) #base r matrix gets info from order inputted not names
+  coordsNA$y <- as.numeric(stalk$lat)
+  SpatialPoints(coordsNA, proj4string = CRS("+proj=longlat +datum=WGS84")) -> llcoords # makes s4
+  spTransform(llcoords, CRS("+proj=utm +zone=17 +datum=WGS84 +units=m")) -> tcoords
+  tibble(x = tcoords$x, y = tcoords$y)
+} 
 ```
 
 ```{r}
 UTM_VY <- function(stalk){
-  stalk %>%
-    select(c())# idenity
+  coordsNA <- c() # init matrix
+  coordsNA$x <- as.numeric(stalk$long) #base r matrix gets info from order inputted not names
+  coordsNA$y <- as.numeric(stalk$lat)
+  SpatialPoints(coordsNA, proj4string = CRS("+proj=longlat +datum=WGS84")) -> llcoords # makes s4
+  spTransform(llcoords, CRS("+proj=utm +zone=17 +datum=WGS84 +units=m")) -> tcoords
+  tibble(x = tcoords$x, y = tcoords$y, z = stalk$z)
 }
 ```
 
-Google Maps
+Google Maps -> OpenStreet Data.
+For a cost free solution, I used openstreet data instead of googlemaps API. 
 
-
-Feed google maps a text, get lat long, turn to UTM. 
+Feed OpenStreet a text, get lat long, turn to UTM. 
 
 
 ```{r}
@@ -246,7 +260,7 @@ Vehicle GPS	V	z	2019  ft # ft to meters 1 ft= 0.3048 m
 
 
 ```{r}
-textcoords <- function(stalk){
+textcoords <- function(stalk, inputcity){
   
   stalk %>%
     select(Text) -> string
@@ -256,7 +270,7 @@ textcoords <- function(stalk){
   unlist()%>%
   str_extract_all('\\b(?!(Rd|Road|St|Hwy|Highway|Dr|Ln|Lane|Ct|Court|Ave|Pl)\\b)\\w+') -> names
   
-  readline(prompt = "Enter City in Quotes: ") -> inputcity
+  #readline(prompt = "Enter City in Quotes: ") -> inputcity
   print(inputcity) # checkpt
   city <- getbb(inputcity)
   head(city) #checkpt
@@ -280,7 +294,7 @@ textcoords <- function(stalk){
     unnest(points)-> geompoints_rd2 # coords to match 
   print(geompoints_rd2)
   
-  inner_join(geompoints_rd1, geompoints_rd2, by = c(X = "X", Y = "Y")) %>% 
+  inner_join(geompoints_rd1, geompoints_rd2, by = c(X = "X", Y = "Y"))%>% 
     select(X, Y) %>% head(1) %>%
     transmute(lat= Y, long = X)
   
@@ -292,18 +306,24 @@ stalk <- data.frame(Text = c("Intersection at Victoria Rd and Meadow Rd"))
 stalk2 <- data.frame(Text = c("Intersection of Wood Ave and Parker Road"))
 # test with number streets
 
-textcoords(stalk2)
+textcoords(stalk2, "Asheville")
 ```
+
 ```{r}
 googlemaps_TX <- function(stalk){
-  
+  stalk %>% 
+    textcoords("Asheville") %>%
+    UTM_VX()
 }
+
 ```
 
 
 ```{r}
 googlemaps_TZ <- function(stalk){
-  
+    stalk %>% 
+    textcoords("Asheville") %>%
+    UTM_VX()
 }
 ```
 
@@ -331,7 +351,7 @@ PRry_1_3 <- function(stalk){
 ```{r}
 PRrz_1_3 <- function(stalk){
   stalk %>%
-    select(c(x, y, z)) 
+    select(c(x, y)) 
 }
 ```
 
@@ -375,16 +395,17 @@ as.data.frame(model) -> model #20x11
 # Checked all sources and dests match functions √
 ```
 
-Atatch model to table, and excecute functions to make full sheaf model w outputs:
+Atatch model to table, and execute functions to make full sheaf model w outputs:
 
 
 ```{r}
 Table %>%
   select(entity, case1, key)%>%
-  pivot_wider(names_from = entity, values_from = case1) %>%
+  pivot_wider(names_from = entity, values_from = case1)%>%
+  mutate(across(c(x, y, z, lat, long, theta, r), as.numeric))%>% # needed to transform from chr to dbl. 
   right_join(model, by = c(key = "source")) %>%
-  nest(stalkinput = 2:9) -> checks #%>%
-  #mutate(stalkoutput = map2(.x= map, .y = stalkinput, .f = exec)) -> sheaf 
+  nest(stalkinput = 2:9) %>%
+  mutate(stalkoutput = map2(.x= map, .y = stalkinput, .f = exec)) -> sheaf 
 ```
 
 
@@ -392,5 +413,92 @@ Table %>%
 Definition 3:  
 
 ![Definition 3](GeoDef3.png)
+
+
+# Just for fun, here's the consistency radius:
+
+
+
+
+
+## Consistency Radius: 
+
+radius=ish sd/var of stalkoutputs/ diameter of stalkoutputs. Coord. comp
+Unnest, aggregate along all of the columns. 
+Put the STD together, remember units are diff
+chi square, norm. var. 
+Ideally have user supply aggregation function. 
+
+process below should be a specific function, so to optimize consistency radius. best consistency radius function like lm() taking consistency radius function.
+
+$$d_U(x,y) = \sqrt{\sum_{i \in columns} \frac{A_i}{ncol} | x_i - y_i| ^2}$$
+A is the unit conversion.
+
+We converted everything to radians. 
+
+Unit Conversions
+
+```{r}
+UnitScale <- tibble(variable = c("x", "y", "z", "v_x", "v_y", "t", "Theta1", "Theta2", "s_x", "s_y"),
+                      scale = c(1*110.567*cos(43*pi/180), 1*110.567, 1/1000, 1, 1, 1, pi/180, pi/180, 1*110.567*cos(43*pi/180), 1*110.567)) # Scaling units
+
+SensorScale <- FinSheaf %>% count(SDest) # Scaling Sensors, by n?
+```
+
+
+```{r}
+#Consistency Variance
+FinSheaf %>%
+  group_by(SDest) %>%
+  unnest(stalkoutput)%>%
+  summarise(across(4:13, ~ var(.,na.rm = TRUE))) %>% # Probs dont want var...
+  pivot_longer(cols = 2:11, names_to = "variable", values_to = "stalk") %>%
+  filter(!is.na(stalk)) %>%
+  left_join(UnitScale, by = c(variable = "variable")) %>%
+  mutate(ScaleValue = n()*stalk*scale^2) %>% # conversion factor applied
+  ungroup() %>%
+  summarise(ConsistVar = sd(ScaleValue)) %>% # should be a single number.
+  sqrt()
+
+
+FinSheaf %>%
+  group_by(SDest) %>%
+  unnest(stalkoutput)%>%
+  summarise(across(4:13, ~ n()*var(.,na.rm = TRUE))) %>%
+  pivot_longer(cols = 2:11, names_to = "variable", values_to = "stalk") %>%
+  filter(!is.na(stalk)) %>%
+  left_join(UnitScale, by = c(variable = "variable")) %>%
+  mutate(ScaleValue = stalk*scale^2) %>% # conversion factor applied
+  ungroup() %>%
+  summarise(ConsistSD = sqrt(sum(ScaleValue)))
+```
+
+
+```{r}
+#Consistency Radius
+FinSheaf %>%
+  group_by(SDest) %>%
+  unnest(stalkoutput)%>%
+  pivot_longer(cols = 5:14, names_to = "entity", values_to = "stalk")%>%
+  left_join(localsections, by = c(entity = "entity", SDest = "Key")) %>%
+  mutate(deviations = (stalk-Case1)^2) %>%
+  filter(!is.na(deviations))%>%
+  left_join(UnitScale, by = c(entity = "variable")) %>%
+  mutate(ScaleValue = deviations*scale^2) %>% # conversion factor applied
+  ungroup() %>%
+  summarise(ConsistRad = sqrt(sum(ScaleValue)))
+  
+#variances add. SD's dont. 
+#
+#Unit Conversions:
+
+# have pre-consistency radii , un-group and aggregate all rads to 
+# get consistency radius.
+# ends with: for each stalk you have a radius, then aggregate them, max, sum of squares. 
+
+
+```
+
+
 
 

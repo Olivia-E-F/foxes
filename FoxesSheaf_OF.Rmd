@@ -1,0 +1,46 @@
+---
+title: "FoxesSheaf_OF"
+author: "Olivia Freides"
+date: "6/28/2022"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Modeling the Sheaf in Hunting for Foxes with Sheaves:
+
+For specifics and citations, reference https://www.ams.org/journals/notices/201905/rnoti-p661.pdf
+
+@misc{https://doi.org/10.1090/noti1867,
+  doi = {10.1090/noti1867},
+  
+  url = {https://www.ams.org/journals/notices/201905/rnoti-p661.pdf},
+  
+  author = {Robinson, Michael},
+  
+  keywords = {Data Analysis, Statistics and Probability (physics.data-an), FOS: Physical sciences, FOS: Physical sciences},
+  
+  title = {Hunting for Foxes with Sheaves},
+  
+  journal = {Notices of the American Mathematical Society},
+  
+  year = {2019}
+}
+
+# Relevant Libraries
+
+```{r}
+library(tidyverse)
+library(sp)
+library(sf)
+library(rgdal)
+library(osmdata)
+```
+
+Sheaf Model:
+```{r}
+
+```
+
