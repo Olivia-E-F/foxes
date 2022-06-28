@@ -73,7 +73,7 @@ $$\phi: \mathbb{R}^5 \to \mathbb{R}^5, \phi((x, y, z, r, \theta)^T) = (x, y, z, 
 # UPDATE MODEL:
 X, Z, H -> R2. Z coord not available from openstreet text. Now X, Z, H =  (x, y).
 
-Step 1:  
+# \textbf{Step 1:}
 ## Restriction Functions:
 
 
@@ -167,44 +167,10 @@ ID_XH <- function(stalk){
 }
 ```
 
-
 UTM 0.4.1 functions
 
 For reference on the string specification being out of date:
 https://inbo.github.io/tutorials/tutorials/spatial_crs_coding/
-
-
-```{r}
-#Testing
-SP <- SpatialPoints(cbind(-82.6,35.6 , 2019),
-                    proj4string=CRS("+proj=longlat"))
-
-spTransform(SP, CRS("+proj=utm +zone=17 +datum=WGS84")) # Get zone by lat long to utm.
-
-Table %>% filter(key == "Z")
-Table %>% filter(key == "V") %>% select(case1) -> coords
-SpatialPoints(cbind(unlist(coords)), proj4string = CRS("+proj=longlat")) # pretty sure string specification is not recommended anymore but idk how to do the alternative. And this is quicker...
-
-SitesNA <- c()
-SitesNA$Latitude <- as.numeric(coords$case1[1])
-SitesNA$Longitude <- as.numeric(coords$case1[2])
-coordinates(SitesNA) -> coordstest
-SpatialPoints(coordstest, proj4string = CRS("+proj=longlat")) -> im # makes s4
-spTransform(im, CRS("+proj=utm +zone=17 +datum=WGS84"))
-
-ToUTM <- function(stalk){
-  coordsNA <- c()
-  Table %>% filter(key == "V") %>% select(case1) -> coords
-  coordsNA$Latitude <- as.numeric(coords$case1[1])
-  coordsNA$Longitude <- as.numeric(coords$case1[2])
-  coordinates(coordsNA) -> coordssite
-  SpatialPoints(coordssite, proj4string = CRS("+proj=longlat +ellps=WGS84")) -> llcoords # makes s4
-  spTransform(llcoords, CRS("+proj=utm +zone=17 +datum=WGS84")) -> tcoords
-  print(tcoords)
-
-}
-ToUTM(Table)
-```
 
 ```{r}
 UTM_VX <- function(stalk){
@@ -228,53 +194,31 @@ UTM_VY <- function(stalk){
 }
 ```
 
-Google Maps -> OpenStreet Data.
-For a cost free solution, I used openstreet data instead of googlemaps API. 
+Google Maps -> OpenStreetMap Data.
+For a cost free solution, I used OpenStreetMap data instead of Google Maps API. 
 
-Feed OpenStreet a text, get lat long, turn to UTM. 
-
-
-```{r}
-# Testing
-library(osmdata)
-opq(bbox = 'Asheville North Carolina') %>%
-  add_osm_feature(key = 'road')%>%
-  osmdata_sf()
-
-opq(bbox = 'Asheville North Carolina') %>%
-  osmdata_sf()
-
-
-tibble(feature = available_features()) %>%
-  filter(grepl("road", feature))
-
-SP <- SpatialPoints(cbind(-82.6,35.6, 2019),
-                    proj4string=CRS("+proj=longlat"))
-
-spTransform(SP, CRS("+proj=utm +zone=17 +datum=WGS84"))
-```
-      
-            	x	35.6	lat
-Vehicle GPS	V	y	-82.6	long
-Vehicle GPS	V	z	2019  ft # ft to meters 1 ft= 0.3048 m
-
+Feed OpenStreetMap a text, get lat long, turn to UTM:
 
 ```{r}
-textcoords <- function(stalk, inputcity){
+textcoords <- function(stalk, inputcity){ # take in the stalk + the input city in quotes
   
   stalk %>%
     select(Text) -> string
   
+# Need to get names of the roads only. First select the street name. 
+# For example, Woodly Road. Second, select only the name, Woodly. 
+  
   string %>%
-  str_extract_all('([\\w]*?\\S+).(Rd|Road|St|Hwy|Highway|Dr|Ln|Lane|Ct|Court|Ave|Pl)') %>%
-  unlist()%>%
-  str_extract_all('\\b(?!(Rd|Road|St|Hwy|Highway|Dr|Ln|Lane|Ct|Court|Ave|Pl)\\b)\\w+') -> names
+    str_extract_all('([\\w]*?\\S+).(Rd|Road|St|Hwy|Highway|Dr|Ln|Lane|Ct|Court|Ave|Pl)') %>% 
+    unlist()%>%
+    str_extract_all('\\b(?!(Rd|Road|St|Hwy|Highway|Dr|Ln|Lane|Ct|Court|Ave|Pl)\\b)\\w+') -> names
   
   #readline(prompt = "Enter City in Quotes: ") -> inputcity
   print(inputcity) # checkpt
-  city <- getbb(inputcity)
-  head(city) #checkpt
+  city <- getbb(inputcity) # get bounding box for city.
+  #head(city) #checkpt
   
+# Check database for the road. get sf object.
   citystreets <- city %>%
     opq() %>%
     add_osm_feature("highway", c("motorway", "primary", "secondary", "tertiary", "residential","living_street","unclassified", "service", "footway")) %>%
@@ -282,37 +226,38 @@ textcoords <- function(stalk, inputcity){
   
   print(citystreets) #checkpt, non-zero?
 
-  tibble(name = citystreets$osm_lines$name, geometry = citystreets$osm_lines$geometry) %>%
+  #find coordinates of the first road
+  tibble(name = citystreets$osm_lines$name, geometry = citystreets$osm_lines$geometry) %>% # geometries are linestring objects
     filter(grepl(names[[1]], name)) %>%
-    mutate(points = map(geometry, ~st_coordinates(.) %>% as.data.frame())) %>%
+    mutate(points = map(geometry, ~st_coordinates(.) %>% as.data.frame())) %>% # retrieve coordinates in matrix form
     unnest(points)-> geompoints_rd1 # coords to match
   print(geompoints_rd1)
   
+  # find coordinates of the second road
   tibble(name = citystreets$osm_lines$name, geometry = citystreets$osm_lines$geometry) %>%
     filter(grepl(names[[2]], name)) %>%
     mutate(points = map(geometry, ~st_coordinates(.) %>% as.data.frame())) %>%
     unnest(points)-> geompoints_rd2 # coords to match 
   print(geompoints_rd2)
   
+  # Hope that they intersect! Inner join on the intersection, which gives lat and long of street intersection. 
   inner_join(geompoints_rd1, geompoints_rd2, by = c(X = "X", Y = "Y"))%>% 
     select(X, Y) %>% head(1) %>%
     transmute(lat= Y, long = X)
-  
 }
-
 
 # base test:
 stalk <- data.frame(Text = c("Intersection at Victoria Rd and Meadow Rd"))
 stalk2 <- data.frame(Text = c("Intersection of Wood Ave and Parker Road"))
-# test with number streets
+# Further testing should be done with numbered streets
 
-textcoords(stalk2, "Asheville")
+textcoords(stalk, "Asheville")
 ```
 
 ```{r}
-googlemaps_TX <- function(stalk){
+OSM_TX <- function(stalk){
   stalk %>% 
-    textcoords("Asheville") %>%
+    textcoords("Asheville") %>% # pipe in stalk, then add input city, here from the paper we are in Asheville.
     UTM_VX()
 }
 
@@ -320,16 +265,14 @@ googlemaps_TX <- function(stalk){
 
 
 ```{r}
-googlemaps_TZ <- function(stalk){
+OSM_TZ <- function(stalk){
     stalk %>% 
     textcoords("Asheville") %>%
     UTM_VX()
 }
 ```
 
-
-
-$pr_x-y$: Labels of the form prx-y are projections of the corresponding coordinates (also presentable as binary matrices of the appropriate form).
+$pr_{x-y}$: Labels of the form prx-y are projections of the corresponding coordinates (also presentable as binary matrices of the appropriate form).
 
 $pr_{1-2}$ 
 
@@ -370,13 +313,14 @@ phi_RB <- function(stalk){
   stalk %>%
     mutate(x = x+r*cos(theta), y = y+r*sin(theta)) %>%
     select(c(x, y))
-
 }
 ```
 
 
-Step 2:
-## Assignment Table?:  
+# \textbf{Step 2:}
+
+## Assignment Table:  
+Global section inputs for case 1:
 ![Global Section 1](GeoGlobalSect1.png)
 
 ```{r}
@@ -384,19 +328,18 @@ Table <- read.csv("GeoAssignmentTable.csv")
 Table
 ```
 
-MODEL:
+## MODEL:
 
 ```{r}
-model <- tibble(map = c(ID_V, ID_T, ID_R, ID_G, ID_X, ID_Y, ID_Z, ID_B, ID_H, UTM_VX, UTM_VY,phi_RB,PRgb_1_2, PRry_1_3, PRrz_1_3, ID_YH, ID_ZH, ID_XH, googlemaps_TZ, googlemaps_TX),
+model <- tibble(map = c(ID_V, ID_T, ID_R, ID_G, ID_X, ID_Y, ID_Z, ID_B, ID_H, UTM_VX, UTM_VY,phi_RB,PRgb_1_2, PRry_1_3, PRrz_1_3, ID_YH, ID_ZH, ID_XH, OSM_TZ, OSM_TX),
                     source = c("V", "T", "R", "G", "X", "Y", "Z", "B", "H", "V", "V", "R", "G", "R", "R", "Y", "Z", "X", "T", "T"), #key == source
-                    dest =   c("V", "T", "R", "G", "X", "Y", "Z", "B", "H", "X", "Y", "B", "B", "Y", "Z", "H", "H", "H", "Z", "X")
-                   )
+                    dest =   c("V", "T", "R", "G", "X", "Y", "Z", "B", "H", "X", "Y", "B", "B", "Y", "Z", "H", "H", "H", "Z", "X"))
+
 as.data.frame(model) -> model #20x11
 # Checked all sources and dests match functions √
 ```
 
-Atatch model to table, and execute functions to make full sheaf model w outputs:
-
+Attach model to table, and execute functions to make full sheaf model with outputs:
 
 ```{r}
 Table %>%
@@ -405,23 +348,31 @@ Table %>%
   mutate(across(c(x, y, z, lat, long, theta, r), as.numeric))%>% # needed to transform from chr to dbl. 
   right_join(model, by = c(key = "source")) %>%
   nest(stalkinput = 2:9) %>%
-  mutate(stalkoutput = map2(.x= map, .y = stalkinput, .f = exec)) -> sheaf 
+  mutate(stalkoutput = map2(.x= map, .y = stalkinput, .f = exec)) -> sheaf # These were all global sections, should have cons.rad of 0
+
+Table %>%
+  select(entity, case2, key)%>%
+  pivot_wider(names_from = entity, values_from = case2)%>%
+  mutate(across(c(x, y, z, lat, long, theta, r), as.numeric))%>% # needed to transform from chr to dbl. 
+  right_join(model, by = c(key = "source")) %>%
+  nest(stalkinput = 2:9) %>%
+  mutate(stalkoutput = map2(.x= map, .y = stalkinput, .f = exec)) -> sheaf2
+# This one should not have cons.rad of 0
+
+#Both cases work! Problem lies in connection for osmdata sometimes it doesnt run... not my problem.
 ```
 
 
-##Global Sections
+# Global Sections
 Definition 3:  
 
 ![Definition 3](GeoDef3.png)
 
+***** PLEASE NOTE THAT I CANNOT FIGURE OUT DATA FOR TABLE FOR EXAMPLE 5.2..., IF ITS THERE PLS HELP. *******
 
-# Just for fun, here's the consistency radius:
+# Consistency Radius: 
 
-
-
-
-
-## Consistency Radius: 
+******* BELOW ARE NOTES FROM SHEAFCANON, REDO FOR GEO *******
 
 radius=ish sd/var of stalkoutputs/ diameter of stalkoutputs. Coord. comp
 Unnest, aggregate along all of the columns. 
@@ -498,7 +449,4 @@ FinSheaf %>%
 
 
 ```
-
-
-
 
