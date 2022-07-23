@@ -1,16 +1,16 @@
 sensor,key,entity,case1,case2,units
 Bear Collar,G,x,358391,362888,E
-Bear Collar,G,y,3936750,393837,N
+Bear Collar,G,y,3936750,3938373,N
 Bear Collar,G,z,581,577,m
-Vehicle GPS,V,lat,35.6,35.6,lat
-Vehicle GPS,V,long,-82.6,-82.6,long 
+Vehicle GPS,V,lat,35.56574,35.571411,lat
+Vehicle GPS,V,long,-82.556529,-82.515491,long 
 Vehicle GPS,V,z,2019,2174,ft
 Text,T,Text,"""Intersection of Victoria Rd and Meadow Rd""","""Wood Ave. at Parker Rd""",Text
 Radio VHF Device,R,x,358943,362666,E
 Radio VHF Device,R,y,3936899,3937469,N
 Radio VHF Device,R,z,615.4,643,m
 Radio VHF Device,R,r,572,1500,m
-Radio VHF Device,R,theta,195,40,deg
+Radio VHF Device,R,theta,255,40,deg
 Human,X,x,358943,362666,E
 Human,X,y,3936899,3937469,N
 Human,X,z,615.4,643,m
@@ -20,8 +20,8 @@ Human,Y,z,615.4,643,m
 Human,Z,x,358943,362666,E
 Human,Z,y,3936899,3937469,N
 Human,Z,z,615.4,643,m
-Bear,B,x,358391,362666,E
-Bear,B,y,3936750,3937469,N
+Bear,B,x,358391,362888,E
+Bear,B,y,3936750,3938373,N
 Human,H,x,358943,362666,E
 Human,H,y,3936899,3937469,N
 Human,H,z,615.4,643,m

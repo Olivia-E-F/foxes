@@ -1,0 +1,28 @@
+---
+title: "Untitled"
+author: "Olivia Freides"
+date: "6/28/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(reticulate)
+```
+
+```{r}
+# Data generator for fox hunting simulation
+# (c) 2019 Michael Robinson
+py_install(c('matplotlib', "scipy"))
+py_run_file("foxesgen.py")
+
+```
+
+every step itll step 0.005, start at time zero, location 1,0. and 
+barring is angle betw transmittter and receiver
+
+time, x, y, ID Transmitter, receive signal strength indicator, bearigs angle in degrees (angle between receiver and transmitter). 
+(seconds, m, m, ID ,wats, degrees)

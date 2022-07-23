@@ -2,13 +2,14 @@
 title: "GeolocationSheafEx_OF"
 author: "Olivia Freides"
 date: "5/23/2022"
-output: pdf_document
+output:
+  html_document:
+    df_print: paged
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
-
 
 
 # Modeling the Geolocation Sheaf:
@@ -44,16 +45,17 @@ library(osmdata)
 ```
 
 Sensors:
-[• The GPS reading on the Bear Collar, denoted \textbf{G};  
 
-[[• The Radio VHF Device receiver, denoted \textbf{R};] Location Bear 
+* The GPS reading on the Bear Collar, denoted $\textbf{G};$
+* The Radio VHF Device receiver, denoted $\textbf{R};$
+*  The Text report, denoted $\textbf{T};$ and
+* The Vehicle GPS, denoted $\textbf{V}.$
 
-• The Text report, denoted \textbf{T}; and  
 
-• The Vehicle GPS, denoted \textbf{V}.]] Location Researcher  
+Where $\textbf{G}$ and $\textbf{R}$ trace location of the bear, and $\textbf{R}$, $\textbf{T}$, and $\textbf{V}$ trace the location of the researcher.
 
-\textbf{U = \{V, R, T, G\}} base sensor set ASC $\Delta$, representing the tracking sensor network, contains the face denoted $H = \{V, R, T \}$ and all nine faces are  
-$ \Delta$ = { {V, R, T},  
+$\textbf{U = \{V, R, T, G\}}$ base sensor set ASC $\Delta$, representing the tracking sensor network, contains the face denoted $H = \{V, R, T \}$ and all nine faces are  
+$\Delta$ = { {V, R, T},  
 {V, T}, {R, T}, {V, R},  
 {R, G}, {V}, {R}, {T}, {G} }
 
@@ -179,7 +181,7 @@ UTM_VX <- function(stalk){
   coordsNA$y <- as.numeric(stalk$lat)
   SpatialPoints(coordsNA, proj4string = CRS("+proj=longlat +datum=WGS84")) -> llcoords # makes s4
   spTransform(llcoords, CRS("+proj=utm +zone=17 +datum=WGS84 +units=m")) -> tcoords
-  tibble(x = tcoords$x, y = tcoords$y)
+  tibble(x = tcoords$x, y = tcoords$y, z = stalk$z*0.3048)
 } 
 ```
 
@@ -190,7 +192,7 @@ UTM_VY <- function(stalk){
   coordsNA$y <- as.numeric(stalk$lat)
   SpatialPoints(coordsNA, proj4string = CRS("+proj=longlat +datum=WGS84")) -> llcoords # makes s4
   spTransform(llcoords, CRS("+proj=utm +zone=17 +datum=WGS84 +units=m")) -> tcoords
-  tibble(x = tcoords$x, y = tcoords$y, z = stalk$z)
+  tibble(x = tcoords$x, y = tcoords$y, z = stalk$z*0.3048)
 }
 ```
 
@@ -311,7 +313,7 @@ $$\begin{pmatrix}
 ```{r Functions phi_RB}
 phi_RB <- function(stalk){
   stalk %>%
-    mutate(x = x+r*cos(theta), y = y+r*sin(theta)) %>%
+    mutate(x = x+r*sin(theta*pi/180), y = y+r*cos(theta*pi/180)) %>%
     select(c(x, y))
 }
 ```
@@ -374,14 +376,6 @@ Definition 3:
 
 ******* BELOW ARE NOTES FROM SHEAFCANON, REDO FOR GEO *******
 
-radius=ish sd/var of stalkoutputs/ diameter of stalkoutputs. Coord. comp
-Unnest, aggregate along all of the columns. 
-Put the STD together, remember units are diff
-chi square, norm. var. 
-Ideally have user supply aggregation function. 
-
-process below should be a specific function, so to optimize consistency radius. best consistency radius function like lm() taking consistency radius function.
-
 $$d_U(x,y) = \sqrt{\sum_{i \in columns} \frac{A_i}{ncol} | x_i - y_i| ^2}$$
 A is the unit conversion.
 
@@ -389,64 +383,44 @@ We converted everything to radians.
 
 Unit Conversions
 
+
 ```{r}
-UnitScale <- tibble(variable = c("x", "y", "z", "v_x", "v_y", "t", "Theta1", "Theta2", "s_x", "s_y"),
-                      scale = c(1*110.567*cos(43*pi/180), 1*110.567, 1/1000, 1, 1, 1, pi/180, pi/180, 1*110.567*cos(43*pi/180), 1*110.567)) # Scaling units
+# variables: x, y, z, lat, long, theta, text, r
+UnitScale <- tibble(variable = c("x", "y", "z", "lat", "long", "theta", "Text", "r"),
+                    #scale = c(1, 1, 1, 1, 1, 1, 1, 1))
+                    #           long, lat, ft, lat, long, deg, text,meters
+                      scale = c(1, 1, 1/0.3048, 1, 1, pi/180, 1, 1)) # Scaling units
+# UTM IS IN METESR, SO DONT CHANGE THOSE LAT LONGS....
 
-SensorScale <- FinSheaf %>% count(SDest) # Scaling Sensors, by n?
+SensorScale <- sheaf %>% count(dest) # Scaling Sensors, by n?
 ```
-
 
 ```{r}
 #Consistency Variance
-FinSheaf %>%
-  group_by(SDest) %>%
+sheaf %>%
+  group_by(dest) %>%
   unnest(stalkoutput)%>%
-  summarise(across(4:13, ~ var(.,na.rm = TRUE))) %>% # Probs dont want var...
-  pivot_longer(cols = 2:11, names_to = "variable", values_to = "stalk") %>%
+  summarise(across(4:9, ~ var(.,na.rm = TRUE)))%>% # Probs dont want var...
+  pivot_longer(cols = 2:7, names_to = "variable", values_to = "stalk") %>%
   filter(!is.na(stalk)) %>%
-  left_join(UnitScale, by = c(variable = "variable")) %>%
+  left_join(UnitScale, by = c(variable = "variable"))%>%
   mutate(ScaleValue = n()*stalk*scale^2) %>% # conversion factor applied
   ungroup() %>%
   summarise(ConsistVar = sd(ScaleValue)) %>% # should be a single number.
   sqrt()
 
 
-FinSheaf %>%
-  group_by(SDest) %>%
-  unnest(stalkoutput)%>%
-  summarise(across(4:13, ~ n()*var(.,na.rm = TRUE))) %>%
-  pivot_longer(cols = 2:11, names_to = "variable", values_to = "stalk") %>%
+sheaf %>%
+  group_by(dest) %>%
+  unnest(stalkoutput) %>%
+  arrange(dest) %>%
+  summarise(across(4:9, ~ n()*var(.,na.rm = TRUE))) %>% # why dont we have lat long anymore.....%>%
+  pivot_longer(cols = 2:7, names_to = "variable", values_to = "stalk") %>%
   filter(!is.na(stalk)) %>%
   left_join(UnitScale, by = c(variable = "variable")) %>%
-  mutate(ScaleValue = stalk*scale^2) %>% # conversion factor applied
-  ungroup() %>%
+  mutate(ScaleValue = stalk*scale^2)%>%
+  mutate(sqrt(ScaleValue))%>% # conversion factor applied
+  ungroup()%>%
   summarise(ConsistSD = sqrt(sum(ScaleValue)))
-```
-
-
-```{r}
-#Consistency Radius
-FinSheaf %>%
-  group_by(SDest) %>%
-  unnest(stalkoutput)%>%
-  pivot_longer(cols = 5:14, names_to = "entity", values_to = "stalk")%>%
-  left_join(localsections, by = c(entity = "entity", SDest = "Key")) %>%
-  mutate(deviations = (stalk-Case1)^2) %>%
-  filter(!is.na(deviations))%>%
-  left_join(UnitScale, by = c(entity = "variable")) %>%
-  mutate(ScaleValue = deviations*scale^2) %>% # conversion factor applied
-  ungroup() %>%
-  summarise(ConsistRad = sqrt(sum(ScaleValue)))
-  
-#variances add. SD's dont. 
-#
-#Unit Conversions:
-
-# have pre-consistency radii , un-group and aggregate all rads to 
-# get consistency radius.
-# ends with: for each stalk you have a radius, then aggregate them, max, sum of squares. 
-
-
 ```
 

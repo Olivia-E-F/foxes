@@ -300,6 +300,7 @@ Unit Conversions
 ```{r}
 UnitScale <- tibble(variable = c("x", "y", "z", "v_x", "v_y", "t", "Theta1", "Theta2", "s_x", "s_y"),
                       scale = c(1*110.567*cos(43*pi/180), 1*110.567, 1/1000, 1, 1, 1, pi/180, pi/180, 1*110.567*cos(43*pi/180), 1*110.567)) # Scaling units
+#                              Was the scale to all go to meters? And if so, why is the lat ~80. 110 seems right for lat long conversion, but it looks ike its 111 and 139 according to gogle. 
 
 SensorScale <- FinSheaf %>% count(SDest) # Scaling Sensors, by n?
 ```
