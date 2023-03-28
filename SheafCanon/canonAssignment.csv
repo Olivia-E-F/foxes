@@ -1,4 +1,4 @@
-Sensor,Key,Entity,Case1,Case2,Case3,Units
+sensor,source,variable,case1,case2,case3,units
 Flight plan,U1,x,70.662,70.663,70.612,W
 Flight plan,U1,y,42.829,42.752,42.834,N
 Flight plan,U1,z,11178,11299,11237,m

@@ -34,10 +34,7 @@ For specifics and citations, reference https://www.ams.org/journals/notices/2019
 
 ```{r, message = FALSE, warning=FALSE}
 library(tidyverse)
-library(sp)
-library(sf)
-library(rgdal)
-library(osmdata)
+library(igraph)
 ```
 
 # Sheaf Model: Hunting Foxes with Sheaves
@@ -134,7 +131,7 @@ ID_R3 <- function(stalk){
 # Sensor 3'
 ID_R3prime <- function(stalk){
   stalk %>%
-    select(c(foxx, foxy, power, s3px, s3py))
+    select(c(foxx, foxy, power, s3x, s3y))
 }
 ```
 
@@ -153,7 +150,7 @@ ID_R4 <- function(stalk){
 # Sensor 4'
 ID_R4prime <- function(stalk){
   stalk %>%
-    select(c(foxx, foxy, power, s4px, s4py))
+    select(c(foxx, foxy, power, s4x, s4y))
 }
 ```
 
@@ -184,12 +181,12 @@ Other, M:Bearing and Power
 The bearing functions transform the (X,Y) location to compass bearing in degree. Output is a single number.
 The power functions output fox transmitter power from transmitter location (X,Y) and receiver location (X',Y').
 
-![power](rssi.png)
+![power](./images/rssi.png)
 
 ```{r}
 B1prime_B1 <- function(stalk){
   stalk %>%
-    mutate(bearing = atan2((s1x-s1px),(s1y-s1py))) %>% 
+    mutate(bearing = (180/pi)*atan2((foxx-s1x),(foxy-s1y))) %>% 
     select(bearing, s1x, s1y)
 }
 ```
@@ -218,7 +215,7 @@ Fprime_F <- function(stalk){
 ```{r}
 B2prime_B2 <- function(stalk){
   stalk %>%
-    mutate(bearing = atan2((s2x-s2px),(s2y-s2py))) %>% 
+    mutate(bearing = (180/pi)*atan2((foxx-s2x),(foxy-s2y))) %>% 
     select(bearing, s2x, s2y)
 }
 ```
@@ -226,7 +223,7 @@ B2prime_B2 <- function(stalk){
 ```{r}
 R3prime_R3 <- function(stalk){
   stalk %>%
-    mutate(rssi = power/(4*pi*(((s3x-s3px)^2 + (s3y-s3py)^2)))) %>%
+    mutate(rssi = power/(4*pi*(((s3x-foxx)^2 + (s3y-foxy)^2)))) %>%
     select(rssi, s3x, s3y)
 }
 ```
@@ -234,7 +231,7 @@ R3prime_R3 <- function(stalk){
 ```{r}
 R4prime_R4 <- function(stalk){
   stalk %>%
-    mutate(rssi = power/(4*pi*(((s4x-s4px)^2 + (s4y-s4py)^2)))) %>%
+    mutate(rssi = power/(4*pi*(((s4x-foxx)^2 + (s4y-foxy)^2)))) %>%
     select(rssi, s4x, s4y)
 }
 ```
@@ -242,7 +239,7 @@ R4prime_R4 <- function(stalk){
 ```{r}
 R3prime_Fprime <- function(stalk){
   stalk %>%
-    mutate(rssi = power/(4*pi*(((s4x-s4px)^2 + (s4y-s4py)^2)))) %>%
+    mutate(rssi = power/(4*pi*(((s4x-foxx)^2 + (s4y-foxy)^2)))) %>%
     select(rssi, foxx, foxy)
 }
 ```
@@ -250,7 +247,7 @@ R3prime_Fprime <- function(stalk){
 ```{r}
 R4prime_Fprime <- function(stalk){
   stalk %>%
-    mutate(rssi = power/(4*pi*(((s4x-s4px)^2 + (s4y-s4py)^2)))) %>%
+    mutate(rssi = power/(4*pi*(((s4x-foxx)^2 + (s4y-foxy)^2)))) %>%
     select(rssi, foxx, foxy)
 }
 ```
@@ -262,7 +259,7 @@ Case 5 and Case 1:
 
 Two foxes, four sensors, 4 receivers.
 
-![Case 5](case5foxes.png)
+![Case 5](./images/case5foxes.png)
 
 ```{r}
 assignment <- read.csv("foxes_assignments.csv") 
@@ -270,6 +267,7 @@ head(assignment)
 ```
 
 # Model:
+Pre- sheaf:
 
 ```{r}
 # functions are labeled source_destination
@@ -284,91 +282,211 @@ model <- tibble(map = c(ID_B1, ID_B1prime, ID_B2, ID_B2prime, ID_F,ID_Fprime,
                 dest   = c("B1", "B1prime", "B2", "B2prime", "F", "Fprime","R3",
                            "R3prime", "R4", "R4prime","F","B1","F","B2","F",
                            "R3","R4","Fprime","Fprime"))
-
-# Checked all sources and dests match functions
 # size = 19x3, 9 ID + 10 maps
 
 as.data.frame(model) -> model 
 ```
-
-
-* Note: No need for unit conversions.
-
 
 # Sheaf: case 1
 key = sensor
 
 ```{r, tidy=TRUE, tidy.opts=list(width.cutoff=60)}
 assignment %>%
-  select(sensor, case1, entity)%>%
-  pivot_wider(names_from = entity, values_from = case1)%>%
-  mutate(across(c(s1x, s1y, s1px, s1py, s2x, s2y, s2px, s2py, s3x, s3y, s3px, s3py, s4x, s4y, s4px, s4py, bearing, rssi,power, foxx, foxy), as.numeric)) %>%
-  right_join(model, by = c(sensor = "source"))%>%
-  nest(stalkinput = 2:22) %>%
-  mutate(stalkoutput = map2(.x= map, .y = stalkinput, .f = exec)) -> sheafc1
+  select(source, case1, variable)%>%
+  pivot_wider(names_from = variable, values_from = case1)%>%
+  #mutate(across(!source, as.numeric))%>%
+  right_join(model, by = c(source = "source"))%>%
+  nest(stalkinput = !source & !map & !dest)%>%
+  mutate(stalkoutput = map2(.x= map, .y = stalkinput, .f = exec))-> sheafc1
 ```
+
+Consistency Radius: sheafc1
+
+```{r}
+verticies3 <- as.character(unique(sheafc1$dest))
+graph3 <- tibble(source=factor(sheafc1$source,levels=verticies3),
+                 destination=factor(sheafc1$dest,levels=verticies3))
+#transitive_closure(graph)
+```
+
+```{r}
+UnitScale <- tibble(scale = rep(1, length(assignment$variable)), variable = c(assignment$variable))
+```
+
+
+```{r}
+sheafc1%>%
+  group_by(dest) %>%
+  unnest(stalkoutput)%>%
+  pivot_longer(cols = !source & !map & ! dest & !stalkinput, names_to = "variable", values_to = "stalk")%>%
+  left_join(assignment, by = c(variable = "variable", source = "source"))%>%
+  mutate(deviations = (stalk-case1)^2) %>%
+  filter(!is.na(deviations)) %>%
+  left_join(UnitScale, by = c(variable = "variable"))%>%
+  mutate(ScaleValue = deviations*scale^2) %>% # conversion factor applied
+  ungroup() %>%
+  summarise(ConsistRad = sqrt(sum(ScaleValue)))
+```
+
+
+Transitive closure:
+
+```{r}
+transitive_closure <- function(sheaf, weight_vec){
+  # or function(sheaf, weight_vec, source_col, dest_col)
+  # ** input weight vec specs. 
+  verticies <- as.character(unique({{sheaf}}$dest))
+  
+  graph <- tibble(source=factor({{sheaf}}$source,levels=verticies),
+                 dest=factor({{sheaf}}$dest,levels=verticies))
+  
+  graph %>%
+    mutate(temp=1)%>% 
+    pivot_wider(names_from=dest,
+                values_from=temp,
+                values_fill=0L, #?
+                id_expand = TRUE,  # The _expand options use the factor levels
+                names_expand = TRUE) -> incidence_tib
+  
+  incidence_tib$source -> source
+  
+  incidence_tib %>%
+    select(!source)%>%
+    as.matrix()-> incidence_matrix
+  diag(incidence_matrix) <- 0
+  
+  incidence_matrix -> incidence_matrix_updated
+  while(norm(incidence_matrix_updated) > 1e-3){
+    incidence_matrix %*% incidence_matrix_updated -> incidence_matrix_updated
+    
+    incidence_matrix_updated %>%
+      as.data.frame()%>%
+      mutate(source = source)%>%
+      pivot_longer(cols = !source, names_to = "dest", values_to ="value") %>%
+      filter(value != 0) %>%
+      select(!value) -> new_edge
+    
+    graph %>%
+      bind_rows(new_edge) -> graph
+  }
+  return(graph)
+}
+```
+
+```{r}
+transedge <- transitive_closure(sheafc1)
+graph_from_edgelist(as.matrix(transedge), directed = T) -> transgraph
+plot(transgraph)
+```
+
 
 
 Consistency Var and SD for Sheaf case 1:
 
 ```{r}
+sheafc1 %>%
+  group_by(dest) %>%
+  unnest(stalkoutput)%>%
+  summarise(across(!source & !map & !stalkinput, ~ var(.,na.rm = TRUE)))%>% # summarize ignores grouping variable.
+  pivot_longer(cols = !dest, names_to = "variable", values_to = "stalk")%>%
+  left_join(assignment, by = c(variable = "variable", dest = "source"))%>%
+  mutate(deviations = (stalk-case1)^2)%>%
+  filter(!is.na(deviations)) %>%
+  left_join(UnitScale, by = c(variable = "variable"))%>%
+  mutate(ScaleValue = deviations*scale^2) %>% # conversion factor applied
+  ungroup() %>%
+  summarise(ConsistVar = sum(stalk))
+# gets me 3.570606e-06	, 3.570606e-06	
+
+sheafc1%>%
+  group_by(dest) %>%
+  unnest(stalkoutput)%>%
+  pivot_longer(cols = !source & !map & ! dest & !stalkinput, names_to = "variable", values_to = "stalk")%>%
+  left_join(assignment, by = c(variable = "variable", source = "source"))%>%
+  mutate(deviations = (stalk-case1)^2)%>%
+  filter(!is.na(deviations)) %>%
+  left_join(UnitScale, by = c(variable = "variable"))%>%
+  mutate(ScaleValue = deviations*scale^2) %>% # conversion factor applied
+  filter(!is.na(deviations)) %>%
+  ungroup() %>%
+  summarise(ConsistVar = sum(stalk))
+# gets me 3.925345	, -272.04	
+
+
 
 sheafc1 %>%
   group_by(dest) %>%
   unnest(stalkoutput)%>%
-  summarise(across(4:20, ~ var(.,na.rm = TRUE))) %>% 
-  pivot_longer(cols = 2:17, names_to = "variable", values_to = "stalk")%>%
+  summarise(across(!source & !map & !stalkinput, ~ var(.,na.rm = TRUE)))%>%  # summarize ignores grouping variable.
+  pivot_longer(cols = !dest, names_to = "variable", values_to = "stalk")%>%
+  left_join(assignment, by = c(variable = "variable", dest = "source"))%>%
+  mutate(deviations = (stalk-case1)^2)%>%
   filter(!is.na(stalk)) %>%
   ungroup() %>%
-  summarise(ConsistVar = sd(stalk)) %>%
+  summarise(ConsistencySD = sum(stalk)) %>%
   sqrt()
+# gets me 0.001336152	
+
+
 
 sheafc1 %>%
   group_by(dest) %>%
   unnest(stalkoutput) %>%
-  arrange(dest) %>%
-  summarise(across(4:20, ~ n()*var(.,na.rm = TRUE))) %>% 
-  pivot_longer(cols = 2:17, names_to = "variable", values_to = "stalk") %>%
+  arrange(dest)%>%
+  summarise(across(!source & !map & !stalkinput, ~ n()*var(.,na.rm = TRUE)))%>% 
+  pivot_longer(cols = !dest, names_to = "variable", values_to = "stalk") %>%
   filter(!is.na(stalk)) %>%
   ungroup()%>%
-  summarise(ConsistSD = sqrt(sum(stalk)))
+  summarise(ConsistencySD = sum(stalk)) %>%
+  sqrt()
+
+# gets me 0.001889605	
 ```
 
 # Sheaf: case 5
-key = sensor
 
 ```{r}
 assignment %>%
-  select(sensor, case5, entity)%>%
-  pivot_wider(names_from = entity, values_from = case5)%>%
-  right_join(model, by = c(sensor = "source"))%>%
-  nest(stalkinput = 2:22)%>%
+  select(source, case5, variable)%>%
+  pivot_wider(names_from = variable, values_from = case5)%>%
+  right_join(model, by = c(source = "source"))%>%
+  nest(stalkinput = !source & !map & !dest)%>%
   mutate(stalkoutput = map2(.x= map, .y = stalkinput, .f = exec)) -> sheafc5
 ```
 
 Consistency Var and SD for Sheaf case 5:
 
 ```{r}
-sheafc5 %>%
-  group_by(dest) %>%
-  unnest(stalkoutput)%>%
-  summarise(across(4:20, ~ var(.,na.rm = TRUE))) %>% 
-  pivot_longer(cols = 2:17, names_to = "variable", values_to = "stalk")%>%
-  filter(!is.na(stalk)) %>%
-  ungroup() %>%
-  summarise(ConsistVar = sd(stalk)) %>% 
-  sqrt()
+#sheafc5 %>%
+#   group_by(dest) %>%
+#   unnest(stalkoutput)%>%
+#   reframe(!dest & !source & !map & !stalkinput,~ var(.,na.rm = TRUE))
+# 
+# 
+#   summarise(across(!dest & !source & !map & !stalkinput,~ var(.,na.rm = TRUE)),)
+#   summarise(across(!source & !map & !stalkinput, ~ var(.,na.rm = TRUE)),)%>% 
+#   left_join(assignment, by = c(source = "source"))
+# 
+# %>% # source from sheaf+assgn
+#   pivot_longer(cols = !dest, names_to = "variable", values_to = "stalk")%>%
+#   mutate(deviations = (stalk-stalkinput)^2) %>% # new col:: deviations
+#   filter(!is.na(deviations))%>%
+#   left_join(UnitScale, by = c(variable = "variable")) %>% # vars from assgn, variable from UnSc.
+#   mutate(scaled_value = deviations*scale^2) %>% 
+#   ungroup() %>%
+#   summarise(ConsistVar = sum(stalk))
 
 
 sheafc5 %>%
   group_by(dest) %>%
   unnest(stalkoutput) %>%
-  arrange(dest) %>%
-  summarise(across(4:20, ~ n()*var(.,na.rm = TRUE))) %>% 
-  pivot_longer(cols = 2:17, names_to = "variable", values_to = "stalk") %>%
+  summarise(across(!source & !map & !stalkinput, ~ n()*var(.,na.rm = TRUE))) %>% 
+  pivot_longer(cols = !dest, names_to = "variable", values_to = "stalk") %>%
   filter(!is.na(stalk)) %>%
   ungroup()%>%
-  summarise(ConsistSD = sqrt(sum(stalk)))
+  summarise(ConsistSD = sum(stalk)) %>%
+  sqrt()
+# get 0.04860065	, 0.2204556	
 ```
 
 

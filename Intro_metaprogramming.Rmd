@@ -1,0 +1,234 @@
+---
+title: "Intro_Metaprogramming"
+author: "Olivia Freides"
+date: "2/22/2023"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction to Metaprogramming with rlang
+Notes from https://adv-r.hadley.nz/meta-big-picture.html
+
+Used for inspecting and modifying code. 
+Focus on tidy evaluation, eval_tidy *cough cough*
+
+```{r}
+library(rlang)
+library(lobstr) # used to explore tree structure
+library(purrr)
+```
+
+
+# Code is Data:
+
+capture code with rlang:: expr()
+```{r}
+expr(mean(x, na.rm = TRUE))
+#> mean(x, na.rm = TRUE)
+expr(10 + 100 + 1000)
+#> 10 + 100 + 1000
+```
+
+Captured code is called an expression: captures typed code, does not capture code inside a function. 
+To catprue  user input in a fucntion use enexpr(), takes a lazily evaluated arg and turns it into an expression
+```{r}
+capture_it <- function(x) {
+  enexpr(x)
+}
+capture_it(a + b + c)
+#> a + b + c
+```
+
+enexpr() "quotes" its first argument.
+you can modify the expression using [[]] and $.
+
+```{r}
+f <- expr(f(x = 1, y = 2))
+
+# Add a new argument
+f$z <- 3
+f
+#> f(x = 1, y = 2, z = 3)
+
+# Or remove an argument:
+f[[2]] <- NULL
+f
+#> f(y = 2, z = 3)
+```
+
+The first element of expr() is the function to be called, the second is the first argument.
+
+# Code is a tree: abstract syntax tree (ast) :)
+
+to understand the tree like stucture, look at lobstr::ast()
+```{r}
+lobstr::ast(f(a, "b"))
+#> █─f 
+#> ├─a 
+#> └─"b"
+```
+
+```{r}
+lobstr::ast(f1(f2(a, b), f3(1, f4(2))))
+#> █─f1 
+#> ├─█─f2 
+#> │ ├─a 
+#> │ └─b 
+#> └─█─f3 
+#>   ├─1 
+#>   └─█─f4 
+#>     └─2
+```
+
+call2() and unquoting:
+
+rlang::call2() constructs a function call from ts components, the function to call and its arguemnts to call with
+
+```{r}
+call2("f", 1, 2, 3)
+#> f(1, 2, 3)
+call2("+", 1, call2("*", 2, 3))
+#> 1 + 2 * 3
+```
+
+Alternatively, use !!, bang bang the unquote operator, inside expr() and enexpr() to build complex code trees
+
+!!x inserts the code tree stored in x into the expression. 
+```{r}
+xx <- expr(x + x)
+yy <- expr(y + y)
+
+expr(!!xx / !!yy)
+#> (x + x)/(y + y)
+```
+
+
+using enexpr() to capture the users expression, then expr() and !! to create a new expression using a template.
+
+```{r}
+cv <- function(var) {
+  var <- enexpr(var)
+  expr(sd(!!var) / mean(!!var))
+}
+
+cv(x)
+#> sd(x)/mean(x)
+cv(x + y)
+#> sd(x + y)/mean(x + y)
+```
+
+benefit is to avoid paste in the case of weird names or order of operations given expressions.
+
+
+To evaluate an expression, use base::eval(), which takes an expression and an environment, or the current env without specification.
+
+```{r}
+eval(expr(x + y), env(x = 1, y = 10))
+#> [1] 11
+eval(expr(x + y), env(x = 2, y = 100))
+#> [1] 102
+```
+
+Benifit is tweaking the environment:
+- To temporarily override functions to implement a domain specific language.
+- To add a data mask so you can refer to variables in a data frame as if they are variables in an environment.
+
+# Costomizing evaluation with data:
+Rebinding functions vs using tidy evaluation.
+eval_tidy() also takes a data mask, which is typically a data frame. 
+```{r}
+df <- data.frame(x = 1:5, y = sample(5))
+eval_tidy(expr(x + y), df)
+#> [1] 6 6 4 6 8
+```
+
+When you evaliate with a data amsk, you dont have to use $, but you risk ambiguity. (can be solved with .data and .eng pronouns)
+
+```{r}
+with2 <- function(df, expr) {
+  eval_tidy(enexpr(expr), df)
+}
+
+with2(df, x + y)
+#> [1] 6 6 4 6 8
+```
+
+THIS HAS A BUG. we gotta deal:...
+
+# Quosures:
+the problem:
+```{r}
+with2 <- function(df, expr) {
+  a <- 1000
+  eval_tidy(enexpr(expr), df)
+}
+```
+We can see the problem when we use with2() to refer to a variable called a. We want the value of a to come from the binding we can see (10), not the binding internal to the function (1000):
+```{r}
+df <- data.frame(x = 1:3)
+a <- 10
+with2(df, x + a)
+#> [1] 1001 1002 1003
+```
+
+The data structure, quosure, bindles an expression with an exvironment to slve this. eval_tidy() is compatible, but we need to switch enexpr() to enquo(). 
+
+```{r}
+with2 <- function(df, expr) {
+  a <- 1000
+  eval_tidy(enquo(expr), df)
+}
+
+with2(df, x + a)
+#> [1] 11 12 13
+```
+
+When using a data mask, use enquo() over enexpr().
+
+ expressions: capturing the "intent" of the code, so we can express x*10 without defining x. evaluate with eval()
+```{r}
+z <- rlang::expr(y <- x * 10)
+z
+#> y <- x * 10
+```
+
+# Quasiquotation
+
+Quoting function have deep connections to Lisp macros. Macros are run at compile time, which isnt a thing in R. Quoting functions are more closely related to Lisp fexprs, functions where all arguments are quoted by default.
+
+```{r}
+cement <- function(...) {
+  args <- ensyms(...)
+  paste(purrr::map(args, as_string), collapse = " ")
+}
+
+cement(Good, morning, Hadley)
+#> [1] "Good morning Hadley"
+cement(Good, afternoon, Alice)
+#> [1] "Good afternoon Alice"
+```
+
+This function quotes all of its inputs, literally. This is the idea around quoting. We need the ability to unquote, in the case we want Hadley to be stored in a variable, like cement(good, morning, name) 
+where name <-"hadley".
+
+Quasiquotation igees us a standard tool: the bang bang, !!, or unquote operator. i,e. cement(good, morning, !!name)
+
+A note on vocab:: The distinction between quoted and evaluated arguments is important. An evaluated argument obeys R's usual evaluation rules. A quoted argument is captured by the function, and is processed in some custom way. 
+
+# Quoting
+The first part of quasiquotation is quotation: capturing an expression without evaluating it.
+expr() captures the argument exactly as provided (white space and comments are not part of the expression.)
+enexpr() captures what the caller supplied to the function by looking at the internal promise object that powers lazy evaluation.
+
+Base r versions dont support unquoting, for example, expr() in base R is quote() but doesnt allow to unquote.
+
+# Unquoting
+
+
+
+
+
+

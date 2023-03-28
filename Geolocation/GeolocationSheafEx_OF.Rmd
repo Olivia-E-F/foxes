@@ -48,7 +48,7 @@ Sensors:
 
 * The GPS reading on the Bear Collar, denoted $\textbf{G};$
 * The Radio VHF Device receiver, denoted $\textbf{R};$
-*  The Text report, denoted $\textbf{T};$ and
+* The Text report, denoted $\textbf{T};$ and
 * The Vehicle GPS, denoted $\textbf{V}.$
 
 
@@ -326,8 +326,8 @@ Global section inputs for case 1:
 ![Global Section 1](GeoGlobalSect1.png)
 
 ```{r}
-Table <- read.csv("GeoAssignmentTable.csv") 
-Table
+assignment <- read.csv("GeoAssignmentTable.csv") 
+assignment
 ```
 
 ## MODEL:
@@ -344,25 +344,69 @@ as.data.frame(model) -> model #20x11
 Attach model to table, and execute functions to make full sheaf model with outputs:
 
 ```{r}
-Table %>%
-  select(entity, case1, key)%>%
-  pivot_wider(names_from = entity, values_from = case1)%>%
+assignment %>%
+  select(variable, case1, source) %>%
+  pivot_wider(names_from = variable, values_from = case1) %>%
   mutate(across(c(x, y, z, lat, long, theta, r), as.numeric))%>% # needed to transform from chr to dbl. 
-  right_join(model, by = c(key = "source")) %>%
+  right_join(model, by = c(source = "source")) %>%
   nest(stalkinput = 2:9) %>%
   mutate(stalkoutput = map2(.x= map, .y = stalkinput, .f = exec)) -> sheaf # These were all global sections, should have cons.rad of 0
 
-Table %>%
-  select(entity, case2, key)%>%
-  pivot_wider(names_from = entity, values_from = case2)%>%
+assignment %>%
+  select(variable, case2, source)%>%
+  pivot_wider(names_from = variable, values_from = case2)%>%
   mutate(across(c(x, y, z, lat, long, theta, r), as.numeric))%>% # needed to transform from chr to dbl. 
-  right_join(model, by = c(key = "source")) %>%
+  right_join(model, by = c(source = "source")) %>%
   nest(stalkinput = 2:9) %>%
   mutate(stalkoutput = map2(.x= map, .y = stalkinput, .f = exec)) -> sheaf2
 # This one should not have cons.rad of 0
 
 #Both cases work! Problem lies in connection for osmdata sometimes it doesnt run... not my problem.
 ```
+
+
+# transitive closure:
+
+```{r}
+verticies <- as.character(unique(sheaf$dest))
+graph <- tibble(source=factor(sheaf$source,levels=verticies),
+                 destination=factor(sheaf$dest,levels=verticies))
+
+#%>%
+  #filter(source != destination) -> graph
+
+transitive_closure <- function(graph){
+  
+  graph %>%
+    mutate(temp=1)%>% 
+    pivot_wider(names_from=destination,
+                values_from=temp,
+                values_fill=0L, #?
+                id_expand = TRUE,  # The _expand options use the factor levels
+                names_expand = TRUE) -> incidence_tib
+  incidence_tib$source -> source
+  incidence_tib %>%
+    select(!source)%>%
+    as.matrix()-> incidence_matrix
+  diag(incidence_matrix) <- 0
+  incidence_matrix -> incidence_matrix_updated
+  while(norm(incidence_matrix_updated) > 1e-3){
+    incidence_matrix %*% incidence_matrix_updated -> incidence_matrix_updated
+    
+    incidence_matrix_updated %>%
+      as.data.frame()%>%
+      mutate(source = source)%>%
+      pivot_longer(cols = !source, names_to = "destination", values_to ="value") %>%
+      filter(value != 0) %>%
+      select(!value) -> new_edge
+    
+    graph %>%
+      bind_rows(new_edge) -> graph
+  }
+  return(graph)
+}
+```
+
 
 
 # Global Sections
@@ -387,20 +431,54 @@ Unit Conversions
 ```{r}
 # variables: x, y, z, lat, long, theta, text, r
 UnitScale <- tibble(variable = c("x", "y", "z", "lat", "long", "theta", "Text", "r"),
-                    #scale = c(1, 1, 1, 1, 1, 1, 1, 1))
-                    #           long, lat, ft, lat, long, deg, text,meters
+#scale = c(1, 1, 1, 1, 1, 1, 1, 1))
+                    #           long, lat, ft,     lat, long,     deg,    text,meters
                       scale = c(1, 1, 1/0.3048, 1, 1, pi/180, 1, 1)) # Scaling units
 # UTM IS IN METESR, SO DONT CHANGE THOSE LAT LONGS....
 
 SensorScale <- sheaf %>% count(dest) # Scaling Sensors, by n?
 ```
 
+Consistency Radius:
+stalk-case1 -> stalk -na = na, so we're loosing some data it seems
 ```{r}
-#Consistency Variance
+sheaf %>%
+  group_by(dest)%>% # dest from sheaf
+  unnest(stalkoutput)%>% # from sheaf
+  mutate(across(c(Text), as.numeric)) %>%
+  pivot_longer(cols = !source & !map & !dest & !stalkinput, names_to = "variable", values_to = "stalk")%>% 
+  left_join(assignment, by = c(source = "source")) %>%# source from sheaf+assgn
+  mutate(deviations = (stalk-case1)^2)%>% # new col:: deviations # rowwise
+  filter(!is.na(deviations))%>%
+  left_join(unit_scale, by = c(vars = "variable")) %>% 
+  # vars from assgn, variable from UnSc.
+  mutate(scaled_value = deviations*scale^2) %>% 
+  # conversion factor applied, scale from UnSc.
+  ungroup() %>%
+  summarise(consistency_radius = sum(scaled_value)) %>%
+  sqrt()
+
 sheaf %>%
   group_by(dest) %>%
   unnest(stalkoutput)%>%
-  summarise(across(4:9, ~ var(.,na.rm = TRUE)))%>% # Probs dont want var...
+  pivot_longer(cols = !source & !map & ! dest & !stalkinput, names_to = "variable", values_to = "stalk")%>%
+  left_join(assignment, by = c(source = "source"))%>%
+  mutate(deviations = (stalk-case1)^2)%>%
+  filter(!is.na(deviations)) %>%
+  left_join(UnitScale, by = c(variable = "variable"))%>%
+  mutate(ScaleValue = deviations*scale^2) %>% # conversion factor applied
+  ungroup() %>%
+  summarise(consistency_radius = sum(scaled_value)) %>%
+  sqrt()
+```
+
+
+```{r}
+#Consistency Variance for geolocation sheaf
+sheaf %>%
+  group_by(dest) %>%
+  unnest(stalkoutput)%>%
+  summarise(across(!source & !map & !dest & !stalkinput, ~ var(.,na.rm = TRUE)))%>% # Probs dont want var...
   pivot_longer(cols = 2:7, names_to = "variable", values_to = "stalk") %>%
   filter(!is.na(stalk)) %>%
   left_join(UnitScale, by = c(variable = "variable"))%>%
@@ -410,11 +488,11 @@ sheaf %>%
   sqrt()
 
 
-sheaf %>%
+sheaf%>%
   group_by(dest) %>%
   unnest(stalkoutput) %>%
   arrange(dest) %>%
-  summarise(across(4:9, ~ n()*var(.,na.rm = TRUE))) %>% # why dont we have lat long anymore.....%>%
+  summarise(across(!source & !map & !dest & !stalkinput, ~ n()*var(.,na.rm = TRUE)))%>% # why dont we have lat long anymore
   pivot_longer(cols = 2:7, names_to = "variable", values_to = "stalk") %>%
   filter(!is.na(stalk)) %>%
   left_join(UnitScale, by = c(variable = "variable")) %>%

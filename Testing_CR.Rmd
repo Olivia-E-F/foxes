@@ -1,0 +1,125 @@
+---
+title: "Testing_CR"
+author: "Olivia Freides"
+date: "3/3/2023"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## CONSISTENCY RADIUS
+
+From Foxes: No unit conversions: Have a vector of 1s
+
+```{r}
+sheafc1 %>%
+  group_by(dest) %>%
+  unnest(stalkoutput)%>%
+  summarise(across(!sensor & !map & !stalkinput, ~ var(.,na.rm = TRUE)))%>%  # summarize ignores grouping variable.
+  pivot_longer(cols = !dest, names_to = "variable", values_to = "stalk")%>%
+  filter(!is.na(stalk)) %>%
+  ungroup() %>%
+  summarise(ConsistVar = sd(stalk)) %>%
+  sqrt()
+
+sheafc1 %>%
+  group_by(dest) %>%
+  unnest(stalkoutput) %>%
+  arrange(dest)%>%
+  summarise(across(!sensor & !map & !stalkinput, ~ n()*var(.,na.rm = TRUE)))%>% 
+  pivot_longer(cols = !dest, names_to = "variable", values_to = "stalk") %>%
+  filter(!is.na(stalk)) %>%
+  ungroup()%>%
+  summarise(ConsistSD = sqrt(sum(stalk)))
+
+sheafc5 %>%
+  group_by(dest) %>%
+  unnest(stalkoutput)%>%
+  summarise(across(!sensor & !map & !stalkinput, ~ var(.,na.rm = TRUE)),)
+
+%>% 
+  left_join(assignment, by = c(sensor = "sensor"))
+
+%>% # source from sheaf+assgn
+  pivot_longer(cols = !dest, names_to = "variable", values_to = "stalk")%>%
+  mutate(deviations = (stalk-stalkinput)^2) %>% # new col:: deviations
+  filter(!is.na(deviations))%>%
+  left_join(unit_scale, by = c(vars = "variable")) %>% 
+      # vars from assgn, variable from UnSc.
+  mutate(scaled_value = deviations*scale^2) %>% 
+  ungroup() %>%
+  summarise(ConsistVar = sd(stalk)) %>% 
+  sqrt()
+
+
+sheafc5 %>%
+  group_by(dest) %>%
+  unnest(stalkoutput) %>%
+  summarise(across(!sensor & !map & !stalkinput, ~ n()*var(.,na.rm = TRUE))) %>% 
+  pivot_longer(cols = !dest, names_to = "variable", values_to = "stalk") %>%
+  filter(!is.na(stalk)) %>%
+  ungroup()%>%
+  summarise(ConsistSD = sum(stalk))
+
+
+sheafc5 %>%
+      group_by(dest)%>% # dest from sheaf
+      unnest(stalkoutput)
+%>% # from sheaf
+      pivot_longer(cols = !dest, names_to = "variable", values_to = "stalk")
+%>% 
+      left_join(assignment, by = c(sensor = "sensor")) %>% # source from sheaf+assgn
+      mutate(deviations = (stalk-stalkinput)^2) %>% # new col:: deviations
+      filter(!is.na(deviations))%>%
+      left_join(unit_scale, by = c(vars = "variable")) %>% 
+      # vars from assgn, variable from UnSc.
+      mutate(scaled_value = deviations*scale^2) %>% 
+      # conversion factor applied, scale from UnSc.
+      ungroup() %>%
+      summarise(consistency_var = sd(stalk)) %>% # aggregation
+      sqrt()
+    
+    ## vs
+    sheafc5 %>%
+      group_by(dest) %>% # dest from sheaf
+      unnest(stalkoutput) %>% # from sheaf
+      summarise(across(!source & !dest & !map & !stalkinput, ~ var(.,na.rm = TRUE))) %>% 
+      pivot_longer(cols = !dest, names_to = "variable", values_to = "stalk")%>% ##**
+      filter(!is.na(stalk)) %>%
+      ungroup() %>%
+      summarise(consistency_var = sum(stalk)) %>% # aggregation
+      sqrt()
+    
+```
+
+```{r}
+#Consistency Variance for geolocation sheaf
+sheaf %>%
+  group_by(dest) %>%
+  unnest(stalkoutput)%>%
+  summarise(across(4:9, ~ var(.,na.rm = TRUE)))%>% # Probs dont want var...
+  pivot_longer(cols = 2:7, names_to = "variable", values_to = "stalk") %>%
+  filter(!is.na(stalk)) %>%
+  left_join(UnitScale, by = c(variable = "variable"))%>%
+  mutate(ScaleValue = n()*stalk*scale^2) %>% # conversion factor applied
+  ungroup() %>%
+  summarise(ConsistVar = sd(ScaleValue)) %>% # should be a single number.
+  sqrt()
+
+
+sheaf %>%
+  group_by(dest) %>%
+  unnest(stalkoutput) %>%
+  arrange(dest) %>%
+  summarise(across(4:9, ~ n()*var(.,na.rm = TRUE))) %>% # why dont we have lat long anymore.....%>%
+  pivot_longer(cols = 2:7, names_to = "variable", values_to = "stalk") %>%
+  filter(!is.na(stalk)) %>%
+  left_join(UnitScale, by = c(variable = "variable")) %>%
+  mutate(ScaleValue = stalk*scale^2)%>%
+  mutate(sqrt(ScaleValue))%>% # conversion factor applied
+  ungroup()%>%
+  summarise(ConsistSD = sqrt(sum(ScaleValue)))
+```
+

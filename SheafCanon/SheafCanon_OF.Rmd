@@ -23,8 +23,8 @@ library(tidyverse)
 
 
 ```{r Table 1}
-Table1 <- read.csv("Assignment2.csv") # Copied Table 1, page 218.
-Table1
+assignment <- read.csv("canonAssignment.csv") # Copied Table 1, page 218.
+assignment
 ```
 
 ```{r Global Vars?}
@@ -42,7 +42,7 @@ Page 214: s_x, s_y are coordinates of an object detected in the satellite image,
 
 $$A(x, y, z, v_x, v_y, t) = \bigg(tan^{-1}\frac{x+v_xt-r_{1x}}{y+v_yt-r_{1y}}, t\bigg)$$
 
-## Functions for DMAP  
+## Restriction Maps 
 
 ```{r Functions A}
 A <- function(stalk) {
@@ -112,9 +112,6 @@ E <- function(stalk) {
 
 ```
 
-
-
-Check Example 15:
 
 ```{r Functions Proj 1}
 pr1xpr2 <- function(stalk){ 
@@ -249,34 +246,29 @@ ID_V3 <- function(stalk){
 
 ![Figure 6](sheafcanon6ab.png)
 
+Pre-sheaf:
 
 ```{r Table 6B}
-SixB <- tibble(SSource = c("X", "X", "X", "X", "U2", "U3", "U3", "U5", "U5", "U4", 
+model <- tibble(source = c("X", "X", "X", "X", "U2", "U3", "U3", "U5", "U5", "U4", 
                            "U4", "X", "U1", "U2", "U3", "U4", "U5", "V1", "V2", "V3"), 
-               SDest =  c("U2", "U3", "U5", "U4", "U1", "V1", "V3", "V1", "V2", "V3",
+               dest =  c("U2", "U3", "U5", "U4", "U1", "V1", "V3", "V1", "V2", "V3",
                           "V2", "X", "U1", "U2", "U3", "U4", "U5", "V1", "V2","V3"),
-               DMap = c(pr1xpr2, A, E, B, U2_pr1, U3_pr1, U3_pr2, C, D, U4_pr2,
+               map = c(pr1xpr2, A, E, B, U2_pr1, U3_pr1, U3_pr2, C, D, U4_pr2,
                         U4_pr1, ID_X, ID_U1, ID_U2, ID_U3, ID_U4, ID_U5, ID_V2, 
                         ID_V2, ID_V3))
-
-#ID maps w functions and SSource+SDest =.
 ```
-
 
 Note: exec takes the function in .x and runs with input .y
 
 ```{r}
-Table1 %>%
-  select(entity, Case1, Key)%>%
-  pivot_wider(names_from = entity, values_from = Case1)%>%
-  right_join(SixB, by = c(Key = "SSource")) %>%
-  nest(stalkinput = 2:12) %>%
-  mutate(stalkoutput = map2(.x= DMap, .y = stalkinput, .f = exec)) -> FinSheaf 
+assignment %>%
+  select(variable, case2, source)%>%
+  pivot_wider(names_from = "variable", values_from = "case2") %>%
+  right_join(model, by = c(source = "source"))%>%
+  nest(stalkinput = !source & !map & !dest)%>%
+  mutate(stalkoutput = map2(.x= map, .y = stalkinput, .f = exec)) -> FinSheaf 
 
 FinSheaf
-
-Table1 %>%
-  select(entity, Case1, Key) -> localsections
 ```
 
 
@@ -291,78 +283,99 @@ Ideally have user supply aggregation function.
 process below should be a specific function, so to optimize consistency radius. best consistency radius function like lm() taking consistency radius function.
 
 $$d_U(x,y) = \sqrt{\sum_{i \in columns} \frac{A_i}{ncol} | x_i - y_i| ^2}$$
-A is the unit conversion.
+A_i is the unit conversion.
 
-We converted everything to radians. 
+Unit Conversions:; note- We converted everything to radians. 
 
-Unit Conversions
+```{r, Units}
+UnitScale <- tibble(variable = c("x", "y", "z", "v_x", "v_y", "t", "Theta1", "Theta2", "s_x", "s_y"),
+                    scale = c(1*110.567*cos(43*pi/180), 1*110.567, 1/1000, 1, 1, 1, pi/180, pi/180, 1*110.567*cos(43*pi/180), 1*110.567)) # Scaling units
+
+SensorScale <- FinSheaf %>% count(dest) # Scaling Sensors, by n?
+```
+
+
+#Consistency Radius
+```{r}
+FinSheaf%>%
+  group_by(dest) %>%
+  unnest(stalkoutput) %>%
+  pivot_longer(cols = !source & !dest & !map & !stalkinput, names_to = "variable", values_to = "stalk")%>%
+  left_join(assignment, by = c(variable = "variable", source = "source"), multiple = "all")%>%
+  mutate(deviations = (stalk-case1)^2)%>%
+  filter(!is.na(deviations))%>%
+  left_join(UnitScale, by = c(variable = "variable"), multiple = "all")%>%
+  mutate(ScaleValue = deviations*scale^2) %>% # conversion factor applied
+  ungroup() %>%
+  summarise(ConsistRad = sqrt(sum(ScaleValue)))
+# case1: 16.52
+# case2: 0
+# case3: 325.96
+```
 
 ```{r}
-UnitScale <- tibble(variable = c("x", "y", "z", "v_x", "v_y", "t", "Theta1", "Theta2", "s_x", "s_y"),
-                      scale = c(1*110.567*cos(43*pi/180), 1*110.567, 1/1000, 1, 1, 1, pi/180, pi/180, 1*110.567*cos(43*pi/180), 1*110.567)) # Scaling units
-#                              Was the scale to all go to meters? And if so, why is the lat ~80. 110 seems right for lat long conversion, but it looks ike its 111 and 139 according to gogle. 
+FinSheaf %>%
+  group_by(dest)%>%
+  unnest(stalkoutput)%>%
+  ungroup() %>%
+  summarise(across(!source & !map & !dest & !stalkinput, ~ var(.,na.rm = TRUE)))%>% 
+  pivot_longer(everything() ,names_to = "variable", values_to = "stalk")%>%
+  filter(!is.na(stalk)) %>%
+  left_join(UnitScale, by = c(variable = "variable")) %>%
+  mutate(ScaleValue = n()*stalk*scale^2) %>% # conversion factor applied
+  summarise(ConsistVar = sum(ScaleValue))# should be a single number.
+```
 
-SensorScale <- FinSheaf %>% count(SDest) # Scaling Sensors, by n?
+
+```{r}
+FinSheaf %>%
+  group_by(dest) %>%
+  unnest(stalkoutput)%>%
+  pivot_longer(!source & !dest & !map & !stalkinput, names_to = "variable", values_to = "stalk")%>%
+  left_join(assignment, by = c(variable = "variable", source = "source")) %>%
+  mutate(deviations = (stalk-case1)^2) %>%
+  filter(!is.na(deviations))%>%
+  left_join(UnitScale, by = c(variable = "variable")) %>%
+  mutate(ScaleValue = deviations*scale^2) %>% # conversion factor applied
+  ungroup() %>%
+  summarise(ConsistRad = sqrt(sum(ScaleValue)))
+
+#= 36.3469
+
 ```
 
 
 ```{r}
 #Consistency Variance
 FinSheaf %>%
-  group_by(SDest) %>%
+  group_by(dest)%>%
   unnest(stalkoutput)%>%
-  summarise(across(4:13, ~ var(.,na.rm = TRUE))) %>% # Probs dont want var...
-  pivot_longer(cols = 2:11, names_to = "variable", values_to = "stalk") %>%
+  ungroup() %>%
+  summarise(across(!source & !map & !dest & !stalkinput, ~ var(.,na.rm = TRUE)))%>% # Probs dont want var...
+  pivot_longer(everything() ,names_to = "variable", values_to = "stalk")%>%
   filter(!is.na(stalk)) %>%
   left_join(UnitScale, by = c(variable = "variable")) %>%
   mutate(ScaleValue = n()*stalk*scale^2) %>% # conversion factor applied
-  ungroup() %>%
-  summarise(ConsistVar = sd(ScaleValue)) %>% # should be a single number.
-  sqrt()
+  summarise(ConsistVar = sum(ScaleValue))# should be a single number.
 
 
 FinSheaf %>%
-  group_by(SDest) %>%
+  group_by(dest) %>%
   unnest(stalkoutput)%>%
-  summarise(across(4:13, ~ n()*var(.,na.rm = TRUE))) %>%
-  pivot_longer(cols = 2:11, names_to = "variable", values_to = "stalk") %>%
+  ungroup()%>%
+  summarise(across(!source & !dest & !map & !stalkinput, ~ n()*var(.,na.rm = TRUE)))%>%
+  pivot_longer(everything(), names_to = "variable", values_to = "stalk") %>%
   filter(!is.na(stalk)) %>%
   left_join(UnitScale, by = c(variable = "variable")) %>%
   mutate(ScaleValue = stalk*scale^2) %>% # conversion factor applied
-  ungroup() %>%
-  summarise(ConsistSD = sqrt(sum(ScaleValue)))
+  summarise(ConsistSD = sum(ScaleValue)) %>%
+  sqrt()
 ```
 
-
-```{r}
-#Consistency Radius
-FinSheaf %>%
-  group_by(SDest) %>%
-  unnest(stalkoutput)%>%
-  pivot_longer(cols = 5:14, names_to = "entity", values_to = "stalk")%>%
-  left_join(localsections, by = c(entity = "entity", SDest = "Key")) %>%
-  mutate(deviations = (stalk-Case1)^2) %>%
-  filter(!is.na(deviations))%>%
-  left_join(UnitScale, by = c(entity = "variable")) %>%
-  mutate(ScaleValue = deviations*scale^2) %>% # conversion factor applied
-  ungroup() %>%
-  summarise(ConsistRad = sqrt(sum(ScaleValue)))
-  
 #variances add. SD's dont. 
-#
-#Unit Conversions:
 
-# have pre-consistency radii , un-group and aggregate all rads to 
-# get consistency radius.
+# have pre-consistency radii , un-group and aggregate all rads to get consistency radius.
 # ends with: for each stalk you have a radius, then aggregate them, max, sum of squares. 
-
-
-```
-
-??? First part of Du{} ???
-Dmap applied on assignment? or just stalkouput?
-
-
 
 ```{r}
 # #Need sheaf and assignment as easy to get things within the df.. I need an assignment table.
@@ -373,9 +386,82 @@ Dmap applied on assignment? or just stalkouput?
 ```
 
 
-# Questions:
+# Transitive Closure:
 
-Consistency radius vs consistency filtration?
+```{r}
+transitive_closure <- function(sheaf, weight_vec){
+  # or function(sheaf, weight_vec, source_col, dest_col)
+  # ** input weight vec specs. 
+  verticies <- as.character(unique({{sheaf}}$dest))
+  iter <- 0
+  
+  graph <- tibble(source=factor({{sheaf}}$source,levels=verticies),
+                 dest=factor({{sheaf}}$dest,levels=verticies))
+  
+  graph %>%
+    mutate(temp=1)%>% 
+    pivot_wider(names_from=dest,
+                values_from=temp,
+                values_fill=0L, #?
+                id_expand = TRUE,  # The _expand options use the factor levels
+                names_expand = TRUE) -> incidence_tib
+  
+  incidence_tib$source -> source
+  
+  incidence_tib %>%
+    select(!source)%>%
+    as.matrix()-> incidence_matrix
+  diag(incidence_matrix) <- 0
+  
+  incidence_matrix -> incidence_matrix_updated
+  while(norm(incidence_matrix_updated) > 1e-3){
+    incidence_matrix %*% incidence_matrix_updated -> incidence_matrix_updated
+    
+    incidence_matrix_updated %>%
+      as.data.frame()%>%
+      mutate(source = source)%>%
+      pivot_longer(cols = !source, names_to = "dest", values_to ="value") %>%
+      filter(value != 0) %>%
+      select(!value) -> new_edge
+    
+    iter <<- iter + 1
+    
+    graph %>%
+      bind_rows(new_edge) -> graph
+  }
+  return(graph)
+  print(iter)
+}
+```
+
+
+```{r}
+closure <- transitive_closure(FinSheaf)
+
+FinSheaf %>% nest_by(source, dest) %>% map(., transitive_closure()
+
+#X goes to U2, which goes to U1: pr1xpr2, pr1
+
+closure %>% rowwise(pluck())
+
+
+FinSheaf %>% 
+  mutate(s2 = source, d2 = dest) %>%
+  nest(s2, d2) %>% rename(pairs = data) %>%
+  nest_by(source, dest, stalkinput, stalkoutput) %>%
+  rename(map_pairs = data) %>%
+  merge(closure, all = T)
+
+```
+X to U1, we want X-> U2, U2 -> U1
+
+
+
+I want to store a pair of edges for each new composition and then nest them and then map them. 
+
+
+
+# Questions:
 
 From PNLL+Robinson paper
 
@@ -383,7 +469,7 @@ Joslyn, Cliff A., et al. “A Sheaf Theoretical Approach to Uncertainty Quantifi
 
 The consistency radius (more fully developed by Robinson [2] in later work) provides a native global measure of the uncertainty among the sensors present in any reading. Beyond that, the consistency filtration provides a detailed breakdown of the contributions of particular sensors and sensor combinations to that overall uncertainty.
 
-Pseudometric: function that takes in 2 elements of a set, produces a non negtive real number.
+Pseudometric: function that takes in 2 elements of a set, produces a non-negative real number.
 d_u is a pseudometric. 
 
 Maximum aggregation variant:
@@ -397,16 +483,23 @@ In practice, MAX.
 
 $$c_{\mathcal{S}}(a) := \sup_{U \subseteq V \in \mathcal{T}} \; d_U((\mathcal{S}(U \subseteq V)) a(V), a(U))$$
 ^ Sensitive to outliers. Better for theorem proving.
-d_U is a fn, the pseud. produces real num. 
+d_U is a function/pseudometric that produces real number. 
 
-Norm: input element of set, produces non neg real num. 
+Norm: input element of set, produces non-negative real number.
 
 Stalk outputs: $\mathcal{S}(U \subseteq V)) a(V)$
 
 Lest squares aggregation variant:
 $$c_{\mathcal{S}}(a) := \sqrt{\sum_{U \subseteq V \in \mathcal{T}} \; d_u((\mathcal{S}(U \subseteq V)) a(V), a(U))^2}$$
+Least squares aggregation variant of consistency:: I.e consistency radius per “A Sheaf Theoretical Approach to Uncertainty...”
 
-^Less sensitive to outliers
+sqrt(
+  sum(
+    (stalkoutput-assignment_case)^2
+  )
+)
+
+This method is less sensitive to outliers than taking the supremum of the distances between stalkoutput and assignments.
 
 Every norm on $\mathbb{R}^n$ has an associated consistency radius. 
 
@@ -422,67 +515,8 @@ Per Pysheaf: Computes the error between the data assignments and extended assign
 
 norm(differences in assignment?)
 
-
-
-
-# Relevant Testing:
-
-```{r}
-# Keep in mind when pivoting for consistency rad.
-
-Table1 %>%
-  mutate(label = str_c(Sensor, ".", entity))%>%
-  select(label, Case1, Key)%>%
-  pivot_wider(names_from = label, values_from = Case1)
-
-
-```
-
 Testing variances:
 
-```{r}
-FinSheaf %>%
-  group_by(SDest) %>%
-  unnest(stalkoutput) %>%
-  summarise(across(4:13, ~ var(.,na.rm = TRUE))) -> Testsheaf
-
-# have pre-consistency radii , un-group and aggregate all rads to 
-# get consistency radius.
-# ends with: for each stalk you have a radius, then aggregate them, max, sum of squares. 
-
-mtcars %>%
-  summarise(across(.cols = mpg:gear, .fns = ~sd(.)))
-
-# mutate(diff = across(stalkoutput,  ~lead(.x) - (.x)))
-
-
-```
-
-Testing to Make one cons. rad:
-```{r}
-#du(S(U5 subset X)(a(x)), a(U5)) = (output of dmap x to u5, ID output)
-# take in:
-#FinSheaf %>% filter(SDest == "U1")%>% mutate(diff = across(c(x,y,z),  ~lead(.x) - (.x)))
-# or reduce(x, "-")) 
-# doesnt work but i want it to. 
-
-
-Testsheaf %>% filter(SDest == "U1")%>% mutate(diff = x[1]-x[2])
-# works but uses idnexing :(
-
-
-#Testsheaf %>% mutate(diff = .[SDest == "U1",] - .[Key == "U2",])
-# Doesnt work but i want it to. -> if you can just run through pairs of sdests and jeys
-
-# FinSheaf%>% 
-#   filter(SDest == "U1") %>%
-#   pivot_wider(stalkoutput, id_cols = c(Key, SDest))
-# 
-# 
-#   mutate(diff = across(stalkoutput,  ~lead(.x) - (.x)))
-
-
-  
-```
-
+have pre-consistency radii , un-group and aggregate all rads to get consistency radius.
+ends with: for each stalk you have a radius, then aggregate them, max, sum of squares. 
 

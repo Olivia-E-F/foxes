@@ -1,0 +1,448 @@
+---
+title: "Making_Functions"
+author: "Olivia Freides"
+date: "2/14/2023"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Making the functions for Sheafr:: To be transfered once pleased
+```{r, include=FALSE}
+library(rlang)
+library(tidyverse)
+```
+
+# Notes for Olivia: make edits on "**"
+
+Testing with Foxes
+
+Sheaf and duality methods for analyzing multi-model systems," in Novel Methods in Harmonic Analysis Volume II, Pesenson, I., Le Gia, Q.T., Mayeli, A., Mhaskar, H., Zhou, D.-X. (eds.), Springer, 2017. (preprint version is arXiv:1604.04647.)
+
+section 3.2
+
+
+# Creating a sheaf:
+
+A sheaf is a topological data structure that holds pairs of partially ordered sets (posets)
+section over each open set in the pre-sheaf
+
+A poset is a set with a binary relation satisfying reflexivity, transitivity, and symmetry. 
+
+Name: read_assignment(source = {list of factors}, values = {list of dbl})
+
+Purpose: Function to read in assignment table and coerce data to a standard format. This is later attached to the sheaf. 
+
+Looks like:
+```{r}
+read_assignment <- function(source, values, variables) {
+  as.data.frame(tibble(source = {{source}},
+                       values = {{values}},
+                       vars = {{variables}}))
+}
+```
+
+```{r}
+assignment_test <- read_assignment(source = assignment$source, values = assignment$case2, variables = assignment$variable)
+```
+
+
+Name: create_sheaf(restriction_maps = {list of functions}, source_col = {column of chars},
+                   destination_col =  {column of chars})
+                   
+Purpose: Function to format pre-sheaf and standardize column names.
+
+Looks like:
+```{r}
+create_sheaf <- function(restriction_maps, source, destination) {
+  as.data.frame(tibble(map =    {{restriction_maps}},
+                       source = {{source}},
+                       dest =   {{destination}}))
+}
+```
+
+
+```{r}
+sheaf_test <- create_sheaf(restriction_maps = model$map, source = model$source, destination = model$dest)
+```
+
+Name: sheaf_assignment(assignment, sheaf, key_col = {column name}, value_col = {column name})
+
+Purpose: This function creates a sheaf assignment pair by executing given restriction functions.
+
+Looks like:
+```{r}
+sheaf_assignment <- function(assignment, sheaf) {
+#create_sheaf <- function(assignment, sheaf, key_col, value_col){
+  {{assignment}} %>%
+    dplyr::select(vars, values, source) %>%
+    tidyr::pivot_wider(names_from = vars, values_from = values) %>% 
+    dplyr::right_join({{sheaf}}, by = c(source = "source"), multiple="all") %>%
+    tidyr::nest(stalkinput = !source & !map & !dest) %>%
+    dplyr::mutate(stalkoutput = purrr::map2(.x= map, .y = stalkinput, .f = exec))
+}
+```
+
+testing
+
+```{r}
+sheaf_assignment(assignment_test, sheaf_test) -> sheaf.assignment.test
+```
+
+# Sheaf Validation: 
+
+Name: validate_sheaf(sheaf)
+
+Purpose: Function ensures assignments and sources have compatible names, and checks that functions commute. I.e. it will check that DA composed with AB is equal to DC composed with CB.
+
+will look like::
+> ifelse(class(FinSheaf)=="tbl_df" | class(FinSheaf) == "tbl"| class(FinSheaf) =="data.frame", yes = 1, no  = 0)
+[1] 1 1 1
+
+```{r}
+validate_sheaf <- function(model, key_col) {
+  if(class({{model}}) != "tbl_df" | class({{model}}) != "tbl"| class({{model}}) !="data.frame"){
+    stop("sheaf must be a tibble or data frame")
+  }
+  if(typeof({{key_col}}) != "character"){
+    stop("-key_col- must be a character")
+  }
+    
+  # need to check types.
+  # assignment has source and values and vars
+  # sheaf has      map ,source, dest
+  # validate sheaf
+  
+  #Code in a pointer to what edge does the sheaf fails on.
+}
+```
+
+# Extra tpological manupulation and calculations:
+
+## Consistency Calculations: Measure consistency among sections of the sheaf. Measure consistency variance, consistency radius, consistency standard deviation, and consistency filtration.
+
+Name: consistency_radius(sheaf = *sheaf*, type = *text key*, variables =*tibble*, scaling_units =*tibble*)
+ maybe type local global?
+
+Purpose: Calculates consistency radius (local vs global?) This is a Least squares aggregation variant of consistency:: 
+  \\I.e consistency radius per “A Sheaf Theoretical Approach to Uncertainty...”
+  \\sqrt(
+    \\sum(
+      \\(stalkoutput-assignment_case)^2
+    \\)
+  \\)
+  \\This method is less sensitive to outliers than taking the supremum of the distances between stalkoutput and assignments.
+  ""Consistency radius as a continuous function of the sheaf and of the assignment (jointly!)"" from pseudometric spaces paper
+  
+looks like:
+```{r}
+consistency_radius <- function(sheaf.assignment, assignment, variables, scaling_units) {
+  # First, ensure that we can compute conversions
+  if(is.null({{variables}}) == FALSE & is.null({{scaling_units}}) == FALSE){
+    unit_scale <- tibble::tibble(variable = c({{variables}}),
+                         scale = c({{scaling_units}}))
+  } else {
+    stop("Supply -variables- and -scaling_units- if you wish to use a conversion factor,
+         else supply a unit vector of size length(-variables-)")}
+  # ensure sheaf is present
+  # if(is.null({{sheaf.assignment}})==TRUE){
+  #   stop("Please include your sheaf")}
+  # ensure one scaling unit per variable
+  if(length({{variables}}) != length({{scaling_units}})){
+    stop("length of -scaling_units- must equal the length of -variables-")
+  }
+  
+  # Calculate consistency Radius
+  {{sheaf.assignment}} %>%
+    group_by(dest) %>% # dest from sheaf.assignment
+    unnest(stalkoutput)%>% # from sheaf.assignment
+    pivot_longer(cols = !source & !dest & !map & !stalkinput,
+                        names_to = "variable",
+                        values_to = "stalk")%>%
+    left_join({{assignment}}, 
+                     by = c(variable = "vars", source = "source"),
+                     multiple="all") %>%
+    # source from sheaf.assignment and assignment
+    mutate(deviations = (stalk - values)^2) %>% # new col:: deviations
+    # rowwise
+    filter(!is.na(deviations))%>%
+    left_join(unit_scale,
+                     by = c(variable = "variable"),
+                     multiple="all") %>%
+    # vars from assgn, variable from UnSc.
+    mutate(scaled_value = deviations * scale^2) %>%
+    # conversion factor applied, scale from UnSc.
+    ungroup() %>%
+    summarise(consistency_radius = sum(scaled_value)) %>%
+    sqrt()
+}
+
+FinSheaf%>%
+  group_by(dest) %>%
+  unnest(stalkoutput) %>%
+  pivot_longer(cols = !source & !dest & !map & !stalkinput, names_to = "variable", values_to = "stalk")%>%
+  left_join(assignment, by = c(variable = "variable", source = "source"))%>%
+  mutate(deviations = (stalk-case3)^2)%>%
+  filter(!is.na(deviations))%>%
+  left_join(UnitScale, by = c(variable = "variable"))%>%
+  mutate(ScaleValue = deviations*scale^2) %>% # conversion factor applied
+  ungroup() %>%
+  summarise(ConsistRad = sqrt(sum(ScaleValue)))
+# case1: 16.52
+# case2: 0
+# case3: 325.96
+```
+
+```{r}
+consistency_radius(sheaf.assignment.test,
+                   assignment_test,
+                   variables = c("x", "y", "z", "v_x", "v_y", "t", "Theta1", "Theta2", "s_x", "s_y", "s"),
+                   scaling_units = c(1*110.567*cos(43*pi/180), 1*110.567, 1/1000,
+                                     1, 1, 1, pi/180, pi/180,
+                                     1*110.567*cos(43*pi/180), 1*110.567, 1))
+```
+
+
+
+Name: transitive_closure
+description:
+params:
+returns:TRANSITIVE CLOSURE***: table w more rows and same columns. each row is an edge in the graph,
+Need to start thinking in terms of graphs
+Read up on the algorithms for measuring transitive closure.
+Function composition, sequence of compositions.
+
+assignment has source and values and vars, sheaf has map ,source, dest
+
+```{r}
+transitive_closure <- function(sheaf, weight_vec) {
+  # or function(sheaf, weight_vec, source_col, dest_col)
+  # ** input weight vec specs. 
+  verticies <- as.character(unique({{sheaf}}$dest))
+  
+  graph <- tibble(source = factor({{sheaf}}$source,levels = verticies),
+                 dest = factor({{sheaf}}$dest,levels = verticies))
+  
+  graph %>%
+    mutate(temp=1)%>% 
+    pivot_wider(names_from = dest,
+                values_from = temp,
+                values_fill = 0L, #?
+                id_expand = TRUE,  # The _expand options use the factor levels
+                names_expand = TRUE) -> incidence_tib
+  
+  incidence_tib$source -> source
+  
+  incidence_tib %>%
+    select(!source)%>%
+    as.matrix()-> incidence_matrix
+  diag(incidence_matrix) <- 0
+  
+  incidence_matrix -> incidence_matrix_updated
+  while(norm(incidence_matrix_updated) > 1e-3){
+    incidence_matrix %*% incidence_matrix_updated -> incidence_matrix_updated
+    
+    incidence_matrix_updated %>%
+      as.data.frame()%>%
+      mutate(source = source)%>%
+      pivot_longer(cols = !source, names_to = "dest", values_to = "value") %>%
+      filter(value != 0) %>%
+      select(!value) -> new_edge
+    
+    graph %>%
+      bind_rows(new_edge) -> graph
+  }
+  return(graph)
+}
+```
+
+
+
+We may want to use case_when to indicate the Na values in specific columns.
+Also consider a nest_join
+
+
+Name: consistency_filtration
+Purpose: "When thresholded, the consistency radius produces the consistency filtration, which is a filtration of open covers."
+"the consistency filtration is a functor that transforms the structure of the sheaf and assignment into a nested set of covers in a structure-preserving way."
+
+
+"It's a bit complicated, actually.  The "Hunting for Foxes" paper has perhaps the simplest description of it, while the "Assignments" paper has the most general version.  
+
+The basic idea is that for every nonnegative real number T you're picking up the collection of all the Alexandrov open sets in the sheaf's base space on which the local consistency radius is below T.  
+
+The subtlety is that open sets can nest inside one another; you only need to retain the largest of each.  This means that you can sweep through all open sets exactly once, rather than having to revisit them.  Additionally, since the open sets are partially ordered by inclusion, you know in which order to visit them in the first place.  This helps make the algorithm for computing the entire consistency filtration (for all real numbers T) computationally feasible and efficient."
+
+restrictions are now refinement functions
+
+
+looks like:
+```{r}
+consistency_filtration <- function(sheaf) {
+  # Compute transitive closure:
+}
+```
+
+
+## Assignment fusions::
+
+Name: fuse_assignments(assignment, sheaf)
+Purpose:fuse_assign
+
+?algorithm to find all local sections of a sheaf?
+
+Main differences: 
+I assign with a table, it's not built out one by one, i.e add assignment
+
+
+# Look aheads to later releases:
+
+
+OMG Can i create either a wrapper around tikz or can i generate an output file that you import into tikz to create the commutative diagrams that we should be getting out??/?
+
+Maybe consider examples of how this package can be used in tandem with the existing TDA package
+
+
+Other optional types of consistency for later release::
+Types:
+  Type: variance
+  \\Purpose:calculates consistency variance
+  
+  Type: standard deviation (sd)
+  \\Purpose:calculates consistency standard deviation.
+  
+looks like:
+```{r}
+calculate_consistency <- function(sheaf, assignment, type, variables, scaling_units) {
+  # First, ensure that we can compute conversions
+  if(is.null({{variables}}) == FALSE & is.null({{scaling_units}}) == FALSE){
+    unit_scale <- tibble(variable = c({{variables}}),
+                         scale = c({{scaling_units}}))
+  } else {
+    stop("Supply -variables- and -scaling_units- if you wish to use a conversion factor, else supply a unit vector of size length(-variables-)")}
+  
+  # for example:: UnitScale <- tibble(scale = rep(1, length(assignment$entity)), variable = c(assignment$entity))
+  # ensure sheaf is present
+  if(is.null({{sheaf}}) == TRUE){
+    stop("Please include your sheaf")}
+  # ensure consistency type is specified
+  if({{type}} != "variance" & {{type}} != "radius" & {{type}} != "sd" & {{type}} != "filtration"){
+    stop("Please specify type as \"variance\", \"radius\", \"sd\", or \"filtration\".")}
+  # ensure one scaling unit per variable
+  if(length({{variables}} != length({{scaling_units}}))){
+    stop("length of -scaling_units- must equal the length of -variables-")
+  }
+  # Calculate consistency Radius
+  if({{type}} == "radius"){
+    {{sheaf}} %>%
+      group_by(dest) %>% # dest from sheaf
+      unnest(stalkoutput)%>% # from sheaf
+      pivot_longer(cols = !dest, names_to = "variable", values_to = "stalk")%>% 
+      left_join({{assignment}}, by = c(source = "source")) %>% # source from sheaf+assgn
+      mutate(deviations = (stalk-stalkinput)^2) %>% # new col:: deviations
+      # rowwise
+      filter(!is.na(deviations))%>%
+      left_join(unit_scale, by = c(vars = "variable")) %>% 
+      # vars from assgn, variable from UnSc.
+      mutate(scaled_value = deviations*scale^2) %>% 
+      # conversion factor applied, scale from UnSc.
+      ungroup() %>%
+      summarise(consistency_radius = sum(scaled_value)) %>%
+      sqrt()
+  }
+  # Calculate Consistency Variance
+  if({{type}} == "variance"){
+    {{sheaf}} %>%
+      group_by(dest) %>% # dest from sheaf
+      unnest(stalkoutput)%>% # from sheaf
+      pivot_longer(cols = !dest, names_to = "variable", values_to = "stalk")%>%  # also get out map
+      left_join({{assignment}}, by = c(source = "source")) %>% # source from sheaf+assgn
+      mutate(deviations = (stalk-stalkinput)^2) %>% # new col:: deviations
+      filter(!is.na(deviations))%>%
+      left_join(unit_scale, by = c(vars = "variable")) %>% 
+      # vars from assgn, variable from UnSc.
+      mutate(scaled_value = deviations * scale^2) %>% 
+      # conversion factor applied, scale from UnSc.
+      ungroup() %>%
+      summarise(consistency_var = sd(stalk))
+    
+    ## vs
+    {{sheaf}} %>%
+      group_by(dest) %>% # dest from sheaf
+      unnest(stalkoutput) %>% # from sheaf
+      summarise(across(!source & !dest & !map & !stalkinput, ~ var(.,na.rm = TRUE))) %>% 
+      pivot_longer(cols = !dest, names_to = "variable", values_to = "stalk")%>% ##**
+      filter(!is.na(stalk)) %>%
+      ungroup() %>%
+      summarise(consistency_var = sum(stalk))
+  }
+  # Calculate consistency standard deviation
+  if({{type}} =="sd"){
+    {{sheaf}} %>%
+      group_by(dest) %>%
+      unnest(stalkoutput) %>%
+      arrange(dest)%>%
+      summarise(across(!source & !dest & !map & !stalkinput,
+                       ~ n() * var(.,na.rm = TRUE)))%>% 
+      pivot_longer(cols = !dest, names_to = "variable", values_to = "stalk") %>%
+      filter(!is.na(stalk)) %>%
+      ungroup()%>%
+      summarise(consistency_sd = sum(stalk))%>%
+      sqrt()
+    # vs
+    {{sheaf}} %>%
+      group_by(dest) %>% # dest from sheaf
+      unnest(stalkoutput)%>% # from sheaf
+      arrange(dest)%>%
+      pivot_longer(cols = !dest, names_to = "variable", values_to = "stalk")%>% 
+      left_join({{assignment}}, by = c(source = "source")) %>% # source from sheaf+assgn
+      mutate(deviations = (stalk - stalkinput)^2) %>% # new col:: deviations
+      filter(!is.na(deviations))%>%
+      left_join(unit_scale, by = c(vars = "variable")) %>% 
+      # vars from assgn, variable from UnSc.
+      mutate(scaled_value = deviations * scale^2) %>% 
+      # conversion factor applied, scale from UnSc.
+      ungroup() %>%
+      summarise(consistency_sd = sum(stalk)) %>%
+      sqrt()
+  }
+  # Calculate consistency filtration
+  if({{type}} == "filtration"){
+    
+  }
+  if(consistency_radius < 0){
+    warning("Consistency calculations should output a non-negative, real number!")
+  }
+}
+```
+
+  
+  
+RESOURCES:
+
+https://github.com/kb1dds/dowker_statistics/blob/dowker_split/dowker_split.R
+
+https://ecorepsci.github.io/reproducible-science/renv.html
+
+https://github.com/tidyverse/dplyr/blob/main/R/across.R
+
+https://cs.winona.edu/lin/cs440/ch08-2.pdf
+
+Metaprogramming in R videos 
+
+https://search.r-project.org/CRAN/refmans/rlang/html/topic-data-mask-programming.html
+
+https://search.r-project.org/CRAN/refmans/rlang/html/embrace-operator.html
+
+https://search.r-project.org/CRAN/refmans/rlang/html/topic-inject.html
+
+https://search.r-project.org/CRAN/refmans/rlang/html/topic-defuse.html
+
+https://search.r-project.org/CRAN/refmans/rlang/html/topic-metaprogramming.html
+
+https://rlang.r-lib.org/reference/topic-data-mask-programming.html
+
+  
+
