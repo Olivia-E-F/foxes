@@ -138,7 +138,7 @@ Purpose: Calculates consistency radius (local vs global?) This is a Least square
   
 looks like:
 ```{r}
-consistency_radius <- function(sheaf.assignment, assignment, variables, scaling_units) {
+consistency_radius <- function(sheaf, assignment, variables, scaling_units) {
   # First, ensure that we can compute conversions
   if(is.null({{variables}}) == FALSE & is.null({{scaling_units}}) == FALSE){
     unit_scale <- tibble::tibble(variable = c({{variables}}),
@@ -285,6 +285,12 @@ consistency_filtration <- function(sheaf) {
 }
 ```
 
+## Depth First Search:
+
+```{r}
+
+```
+
 
 ## Assignment fusions::
 
@@ -314,6 +320,11 @@ Types:
   \\Purpose:calculates consistency standard deviation.
   
 looks like:
+
+
+## Specifically, your consistency radius calculation function should require the caller to supply a sheaf table that is transitively closed.  
+
+
 ```{r}
 calculate_consistency <- function(sheaf, assignment, type, variables, scaling_units) {
   # First, ensure that we can compute conversions

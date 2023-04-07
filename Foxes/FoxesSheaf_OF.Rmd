@@ -318,11 +318,11 @@ UnitScale <- tibble(scale = rep(1, length(assignment$variable)), variable = c(as
 sheafc1%>%
   group_by(dest) %>%
   unnest(stalkoutput)%>%
-  pivot_longer(cols = !source & !map & ! dest & !stalkinput, names_to = "variable", values_to = "stalk")%>%
-  left_join(assignment, by = c(variable = "variable", source = "source"))%>%
+  pivot_longer(cols = !source & !dest & !map & !stalkinput, names_to = "variable", values_to = "stalk")%>%
+  left_join(assignment, by = c(variable = "variable", source = "source"), multiple="all")%>%
   mutate(deviations = (stalk-case1)^2) %>%
   filter(!is.na(deviations)) %>%
-  left_join(UnitScale, by = c(variable = "variable"))%>%
+  left_join(UnitScale, by = c(variable = "variable"), multiple="all") %>%
   mutate(ScaleValue = deviations*scale^2) %>% # conversion factor applied
   ungroup() %>%
   summarise(ConsistRad = sqrt(sum(ScaleValue)))
@@ -372,6 +372,7 @@ transitive_closure <- function(sheaf, weight_vec){
   return(graph)
 }
 ```
+
 
 ```{r}
 transedge <- transitive_closure(sheafc1)
@@ -487,8 +488,162 @@ sheafc5 %>%
   summarise(ConsistSD = sum(stalk)) %>%
   sqrt()
 # get 0.04860065	, 0.2204556	
+
+sheafc1%>%
+  group_by(dest) %>%
+  unnest(stalkoutput)%>%
+  pivot_longer(cols = !source & !dest & !map & !stalkinput, names_to = "variable", values_to = "stalk")%>%
+  left_join(assignment, by = c(variable = "variable", source = "source"), multiple="all")%>%
+  mutate(deviations = (stalk-(case5))^2) %>%
+  filter(!is.na(deviations)) %>%
+  left_join(UnitScale, by = c(variable = "variable"), multiple="all") %>%
+  mutate(ScaleValue = deviations*scale^2) %>% # conversion factor applied
+  ungroup() %>%
+  summarise(ConsistRad = sqrt(sum(ScaleValue)))
+
+sheafc1%>%
+  group_by(dest) %>%
+  unnest(stalkoutput)%>%
+  pivot_longer(cols = !source & !dest & !map & !stalkinput, names_to = "variable", values_to = "stalk")%>%
+  left_join(assignment, by = c(variable = "variable", source = "source"), multiple="all")%>%
+  mutate(deviations = (stalk-(case5))^2) %>%
+  filter(!is.na(deviations)) %>%
+  left_join(UnitScale, by = c(variable = "variable"), multiple="all") %>%
+  mutate(ScaleValue = deviations*scale^2) %>% # conversion factor applied
+  summarise(LocalCRAD= sum(ScaleValue))%>%
+  summarise(crad = sqrt(sum(LocalCRAD)))
 ```
 
+## Depth First Search algorithm to find the shortest path from a source to a dest node
+Runs in O(n), where n is the number of nodes in the tree, or O(b^d), where b is the branching factor and d is the depth.
+```{r}
+#map_listed <- filter(model, source == "R3prime") %>% select(map)
+#testmap <- map_listed[[1]][[1]]
+
+#start node and curent node
+
+dfs <- function(sheaf, start_node, current_node, map_thusfar){
+  #map_thusfar = function(x){return(x)}
+  next_nodes <- filter(sheaf, source == current_node) %>%
+    filter(dest != current_node)
+  print(paste(current_node))
+  print(next_nodes)
+  print(nrow(next_nodes))
+  if(nrow(next_nodes)>0){
+  for(i in seq(1,nrow(next_nodes))){
+    print(i)
+    print("-------1--------")
+    print(paste(next_nodes$source[[i]],next_nodes$dest[[i]]))
+    sheaf <- sheaf %>%
+      bind_rows(tibble(source = start_node, dest = next_nodes$dest[[i]], map = list(purrr::compose(next_nodes$map[[i]], map_thusfar))))
+    print("------2------")
+    sheaf <- dfs(sheaf, start_node, next_nodes$dest[[i]], purrr::compose(next_nodes$map[[i]], map_thusfar))
+  }
+    }
+  print("------3---------")
+  return(sheaf %>% bind_rows(tibble(source = current_node, dest = current_node, map = list(function(x){x}))))
+}
+
+dfs(model, start_node = "R3prime", current_node = "R3prime", map_thusfar = function(x){x})
+```
+
+
+```{r}
+map_listed <- filter(model, source == "R4prime") %>% select(map)
+testmap <- map_listed[[1]][[1]]
+`%!in%` <- Negate(`%in%`)
+testempty <- function(){}
+model <- filter(model, source !=dest)
+
+dfs <- function(sheaf, current_node, map_thusfar){
+  
+  sheaf <- sheaf %>% filter(source != dest) # get rid of the IDs for now
+  next_nodes <- filter(sheaf, source == current_node)
+  print("Printing next nodes")
+  print(next_nodes)
+
+  #return()
+  
+  print("for loop starts:")
+  for(i in nrow(next_nodes)){
+    print(paste(next_nodes$source[[i]],next_nodes$dest[[i]]))
+    #if(isTRUE(next_nodes$dest[i] %!in% sheaf$source)){ # if its true its not in there
+     # next_nodes <- filter(sheaf, source != current_node)
+     # next_nodes <- next_nodes %>%
+     # bind_rows(tibble(source = current_node, dest = next_nodes$source[i], map = list(map_thusfar)))
+    
+      #return(sheaf)  #%>%
+               #bind_rows(tibble(source = current_node, dest = current_node, 
+                #                map = list(function(x){return(x)}))))
+    map_thusfar <- purrr::compose(next_nodes$map[[i]], map_thusfar)
+    print("Printing map_thusfar (2)")
+    print(map_thusfar)
+
+    sheaf <- sheaf %>%
+      bind_rows(tibble(source = current_node, dest = next_nodes$dest[i], map = list(map_thusfar)))
+  #}    
+    
+    #print("printing next_nodes UPDATED")
+    #print(next_nodes)
+    
+  }
+    sheaf <- sheaf %>%
+      bind_rows(dfs(sheaf = next_nodes, current_node = next_nodes$dest[i], map_thusfar)) # should sheaf be nextnodes
+    
+    print("printing sheaf final")
+    print(sheaf)
+    #}
+  
+  #return(sheaf %>% bind_rows(tibble(source = current_node, dest = current_node, map = list(function(.){return(.)}))))
+}
+
+dfs(model, current_node = "R4prime", testempty)
+```
+
+
+if(is_empty(next_nodes)){
+      next_nodes <- filter(sheaf, source != current_node)
+      print(next_nodes)
+      print("inner for loop")
+      for(j in nrow(next_nodes)){
+        print("printing internal next nodes")
+        print(next_nodes)
+        next_nodes <- next_nodes %>%
+          bind_rows(tibble(source = next_nodes$source[j], dest =
+                             next_nodes$dest[j], map = list(map_thusfar)))
+      }
+      
+      
+
+```{r}
+map_listed <- filter(model, source == "R4prime") %>% select(map)
+testmap <- map_listed[[1]][[1]]
+next_nodes <- filter(sheaf, source == current_node)
+nodes
+model %>%
+  filter(source == "R4prime") -> nodes
+if(next_node[i] %in% source)
+
+nodes
+nodes %>%
+  bind_rows(tibble(map = c(purrr::compose(testmap, nodes$map[[1]])), source = "R4prime", dest = "R4prime")) 
+
+%>%
+  bind_rows(tibble(map = c(purrr::compose(nodes$map[[1]], nodes$map[[2]])), source = "R4prime", dest = "R4")) %>%
+  
+  bind_rows(tibble(map = c(purrr::compose(nodes$map[[1]], nodes$map[[2]])), source = "R4", dest = "")) %>%
+
+
+
+
+
+
+mutate(purrr::compose(testmap, nodes$map[[1]])
+```
+
+
+
+when started from b1 AND f, we just tack on b1 to b1 forever becuase its all that maps to
 
 From paper:
 for c in hunting_sheaf.GetCellIndexList(): hunting_sheaf.MaximallyExtendCell(c)  :: Transitive Closure
